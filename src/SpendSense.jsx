@@ -89,7 +89,7 @@ export default function SpendSenseApp() {
 
   const isDark = settings.theme === 'dark';
 
-  const tabContent = useMemo(() => {
+  const renderTab = () => {
     const common = { settings, showToast };
     switch(activeTab) {
       case 'home':
@@ -105,7 +105,7 @@ export default function SpendSenseApp() {
       default:
         return null;
     }
-  }, [activeTab, settings, expenses, lendings, savingsGoals, showToast]);
+  };
 
   return (
     <>
@@ -160,7 +160,7 @@ export default function SpendSenseApp() {
 
         {/* Main content area */}
         <div className={activeTab === 'chat' ? 'flex flex-col flex-1 overflow-hidden pt-0' : 'flex-1 overflow-y-auto'}>
-          {tabContent}
+          {renderTab()}
         </div>
 
         {/* Bottom Nav */}

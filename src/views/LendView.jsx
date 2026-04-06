@@ -145,7 +145,7 @@ export default function LendView({ settings, lendings, setLendings, showToast })
 
   const pendingCount=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').length,[lendings]);
   const returnedCount=useMemo(()=>lendings.filter(l=>l.status==='returned').length,[lendings]);
-  const pendingTotal=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(l.amountRemaining??l.amount),0),[lendings]);
+  const pendingTotal=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(parseFloat(l.amount)||0),0),[lendings]);
 
   const filtered=useMemo(()=>{
     if(lendFilter==='pending') return lendings.filter(l=>l.status==='pending'||l.status==='partial');
@@ -232,7 +232,7 @@ export default function LendView({ settings, lendings, setLendings, showToast })
           <p className="font-medium text-gray-700">No {lendFilter==='all'?'':lendFilter+' '}lendings</p>
           <p className="text-xs text-gray-400 mt-1">Keep track of who owes you money</p>
         </div>
-      ):lendings.filter(l => lendFilter === 'all' ? true : lendFilter === 'pending' ? (l.status === 'pending' || l.status === 'partial') : l.status === 'returned').map(lend => {
+      ):filtered.map(lend => {
         const original = lend.amountOriginal || parseFloat(lend.amount);
         const paid = lend.amountPaid || 0;
         const remaining = original - paid;

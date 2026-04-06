@@ -108,7 +108,9 @@ export const BottomSheet = ({ isOpen, onClose, title, children }) => {
             </button>
           </div>
         )}
-        {children}
+        <div className="px-4">
+          {children}
+        </div>
       </div>
     </div>
   );
