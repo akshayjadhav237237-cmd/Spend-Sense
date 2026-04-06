@@ -37,7 +37,12 @@ export default function SpendSenseApp() {
   });
   const [lendings, setLendings] = useState(() => {
     const loaded = safeLoad('ss_lendings', []);
-    return Array.isArray(loaded) ? loaded.filter(l => l?.id && l?.amount) : [];
+    return Array.isArray(loaded) ? loaded.filter(l => l?.id && l?.amount).map(l => ({
+      ...l,
+      amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
+      amountPaid: l.amountPaid ?? 0,
+      payments: l.payments ?? []
+    })) : [];
   });
   const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
   const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
