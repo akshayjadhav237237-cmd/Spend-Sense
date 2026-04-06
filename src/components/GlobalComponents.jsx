@@ -83,13 +83,13 @@ export const BottomSheet = ({ isOpen, onClose, title, children, noPad }) => {
   return (
     <div className="fixed inset-0 z-50 animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={onClose} />
-      <div ref={ref} className="absolute bottom-0 left-0 right-0 w-full bg-white rounded-t-3xl animate-slide-up max-h-[92vh] overflow-y-auto pb-safe ss-bottom-sheet ss-text">
-        <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mt-3 mb-1 ss-drag-handle" />
-        <div className={noPad ? '' : 'px-5 pb-8'}>
-          <div className="flex items-center justify-between py-3 px-5">
-            <h2 id="sheet-title" className="font-semibold text-lg text-gray-900 ss-text">{title}</h2>
-            <button onClick={onClose} aria-label="Close modal" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 ss-chip-inactive"><X size={16} /></button>
-          </div>
+      <div ref={ref} className="absolute bottom-0 left-0 right-0 w-full bg-white rounded-t-3xl animate-slide-up pb-safe ss-bottom-sheet ss-text flex flex-col">
+        <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mt-3 mb-1 ss-drag-handle shrink-0" />
+        <div className="flex items-center justify-between py-3 px-5 shrink-0">
+          <h2 id="sheet-title" className="font-semibold text-lg text-gray-900 ss-text">{title}</h2>
+          <button onClick={onClose} aria-label="Close modal" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 ss-chip-inactive"><X size={16} /></button>
+        </div>
+        <div className={`overflow-y-auto max-h-[85vh] ${noPad ? 'pb-32' : 'px-5 pb-32'}`}>
           {children}
         </div>
       </div>

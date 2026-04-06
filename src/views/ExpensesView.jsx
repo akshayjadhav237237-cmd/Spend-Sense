@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, Camera, Trash2, CheckSquare, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Camera, Trash2, CheckSquare, Square, Download } from 'lucide-react';
 import { CATEGORIES, formatCurr, getMonthKey, getCurrentMonthKey, getTodayISO, getRelativeDateLabel, parseAmount, generateId } from '../utils.js';
 import { BottomSheet, ConfirmDialog } from '../components/GlobalComponents.jsx';
 
@@ -108,7 +108,7 @@ function AddExpenseModal({ isOpen, onClose, onAdd, settings, showToast }) {
           {photo && <img src={photo} alt="Receipt preview" className="w-10 h-10 rounded-lg object-cover border border-gray-200"/>}
           <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto}/>
         </div>
-        <button onClick={submit} className="w-full py-3.5 bg-[#6C63FF] text-white rounded-2xl font-semibold text-sm active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+        <button onClick={submit} className="w-full py-3.5 bg-[#6C63FF] text-white rounded-2xl font-semibold text-sm active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 mb-6">
           Add Expense
         </button>
       </div>
@@ -129,7 +129,7 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
   const [swipedId, setSwipedId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
-  const [photoView, setPhotoView] = useState(null);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
 
   const monthTotal = useMemo(()=>expenses.filter(e=>getMonthKey(e.date)===viewMonth).reduce((s,e)=>s+e.amount,0),[expenses,viewMonth]);
   const monthCount = useMemo(()=>expenses.filter(e=>getMonthKey(e.date)===viewMonth).length,[expenses,viewMonth]);
@@ -252,7 +252,7 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-[#FF6B6B]">-{formatCurr(exp.amount,sym)}</p>
-                    {exp.photo && <span className="text-[10px] text-indigo-400">📷</span>}
+                    {exp.photo && <button onClick={(e) => { e.stopPropagation(); setViewingReceipt(exp.photo); }} aria-label="View receipt" className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"><Camera size={14} /></button>}
                   </div>
                 </div>
                 <button onClick={e=>{e.stopPropagation();setDeleteId(exp.id);}} aria-label="Delete expense"
@@ -276,10 +276,18 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
       )}
 
       {/* Photo viewer */}
-      {photoView && (
-        <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center animate-fade-in" onClick={()=>setPhotoView(null)}>
-          <img src={photoView} alt="Receipt" className="max-w-full max-h-full object-contain rounded-xl"/>
-          <button onClick={()=>setPhotoView(null)} aria-label="Close photo" className="absolute top-4 right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white"><X size={20}/></button>
+      {viewingReceipt && (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center max-w-[430px] mx-auto" onClick={() => setViewingReceipt(null)}>
+          <div className="relative w-full px-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-white text-sm font-medium">Receipt</span>
+              <button onClick={() => setViewingReceipt(null)} aria-label="Close receipt" className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center"><X size={18} /></button>
+            </div>
+            <img src={viewingReceipt} alt="Receipt" className="w-full max-h-[75vh] object-contain rounded-2xl" />
+            <button onClick={() => { const a = document.createElement('a'); a.href = viewingReceipt; a.download = 'receipt.jpg'; a.click(); }} className="mt-3 w-full py-3 rounded-xl bg-white/20 text-white text-sm font-medium flex items-center justify-center gap-2">
+              <Download size={16} />Save to device
+            </button>
+          </div>
         </div>
       )}
 
