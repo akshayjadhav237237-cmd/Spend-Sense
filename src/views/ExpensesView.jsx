@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Search, X, Camera, Trash2, CheckSquare, Square, Download } from 'lucide-react';
 import { CATEGORIES, formatCurr, getMonthKey, getCurrentMonthKey, getTodayISO, getRelativeDateLabel, parseAmount, generateId } from '../utils.js';
 import { BottomSheet, ConfirmDialog } from '../components/GlobalComponents.jsx';
@@ -252,7 +253,15 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-[#FF6B6B]">-{formatCurr(exp.amount,sym)}</p>
-                    {exp.photo && <button onClick={(e) => { e.stopPropagation(); setViewingReceipt(exp.photo); }} aria-label="View receipt" className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"><Camera size={14} /></button>}
+                    {exp.photo && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setViewingReceipt(exp.photo); }}
+                        aria-label="View receipt"
+                        className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                      >
+                        <Camera size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <button onClick={e=>{e.stopPropagation();setDeleteId(exp.id);}} aria-label="Delete expense"
@@ -276,19 +285,45 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
       )}
 
       {/* Photo viewer */}
-      {viewingReceipt && (
-        <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center max-w-[430px] mx-auto" onClick={() => setViewingReceipt(null)}>
-          <div className="relative w-full px-4" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-white text-sm font-medium">Receipt</span>
-              <button onClick={() => setViewingReceipt(null)} aria-label="Close receipt" className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center"><X size={18} /></button>
+      {viewingReceipt && createPortal(
+        <div
+          className="fixed inset-0 z-[999] bg-black/95 flex flex-col items-center justify-center max-w-[430px] mx-auto"
+          onClick={() => setViewingReceipt(null)}
+        >
+          <div
+            className="relative w-full px-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-white text-sm font-semibold">Receipt</span>
+              <button
+                onClick={() => setViewingReceipt(null)}
+                aria-label="Close receipt viewer"
+                className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <img src={viewingReceipt} alt="Receipt" className="w-full max-h-[75vh] object-contain rounded-2xl" />
-            <button onClick={() => { const a = document.createElement('a'); a.href = viewingReceipt; a.download = 'receipt.jpg'; a.click(); }} className="mt-3 w-full py-3 rounded-xl bg-white/20 text-white text-sm font-medium flex items-center justify-center gap-2">
-              <Download size={16} />Save to device
+            <img
+              src={viewingReceipt}
+              alt="Receipt"
+              className="w-full max-h-[70vh] object-contain rounded-2xl"
+            />
+            <button
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = viewingReceipt;
+                a.download = 'receipt.jpg';
+                a.click();
+              }}
+              className="mt-4 w-full py-3 rounded-xl bg-white/20 text-white text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            >
+              <Download size={16} />
+              Save to Device
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <AddExpenseModal isOpen={showAdd} onClose={()=>setShowAdd(false)} onAdd={addExpense} settings={settings} showToast={showToast}/>
