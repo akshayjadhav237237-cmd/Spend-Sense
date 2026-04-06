@@ -93,7 +93,7 @@ export const BottomSheet = ({ isOpen, onClose, title, children }) => {
       <div
         ref={sheetRef}
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl animate-slide-up ss-bottom-sheet ss-text"
-        style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: '120px' }}
+        style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: '140px' }}
       >
         <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mt-3 mb-4 ss-drag-handle" />
         {title && (
