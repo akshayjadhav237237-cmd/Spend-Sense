@@ -137,6 +137,7 @@ export default function LendView({ settings, lendings, setLendings, showToast })
   const [lendFilter,setLendFilter]=useState('pending');
   const [showAdd,setShowAdd]=useState(false);
   const [deleteId,setDeleteId]=useState(null);
+  const [expandedPayments, setExpandedPayments] = useState({});
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState(null);
@@ -237,7 +238,7 @@ export default function LendView({ settings, lendings, setLendings, showToast })
         const remaining = original - paid;
         const progressPct = original > 0 ? (paid / original) * 100 : 0;
         const daysSince = Math.floor((Date.now() - new Date(lend.date+'T00:00:00')) / 86400000);
-        const [expanded, setExpanded] = useState(false);
+        const expanded = expandedPayments[lend.id] || false;
         return (
           <div key={lend.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card relative">
             <button onClick={()=>setDeleteId(lend.id)} aria-label="Delete lending" className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 active:scale-95 transition-transform"><Trash2 size={14}/></button>
@@ -313,7 +314,7 @@ export default function LendView({ settings, lendings, setLendings, showToast })
             {lend.payments && lend.payments.length > 0 && (
               <div className="mt-3 border-t border-gray-50 pt-3 ss-divider">
                 <button
-                  onClick={() => setExpanded(e => !e)}
+                  onClick={() => setExpandedPayments(prev => ({ ...prev, [lend.id]: !prev[lend.id] }))}
                   className="flex items-center justify-between w-full text-xs text-gray-400 ss-text-muted"
                 >
                   <span>{lend.payments.length} payment{lend.payments.length > 1 ? 's' : ''} recorded</span>
