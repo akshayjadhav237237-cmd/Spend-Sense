@@ -173,3 +173,8 @@ Deployed on **Vercel** with automatic production builds.
 ## 📄 License
 
 MIT © Akshay Jadhav
+
+
+
+
+NOTE: IF THE LINK YOU OPENED IS SHOWING A BLANK SCREEN THEN PRESS CTRL + SHIFT + R. 
