@@ -1,86 +1,72 @@
-<div align="center">
+# 💸 SpendSense — Student Finance App
 
-<img src="public/icon-512.png" alt="SpendSense Logo" width="100" height="100" style="border-radius: 22px"/>
+> A beautiful, mobile-first Personal Finance PWA built for students. Track expenses, manage lendings, set savings goals, and get AI-powered financial insights — all offline-capable and installable as a native Android app.
 
-# SpendSense 💸
-
-**The smart finance tracker built for students.**  
-Track expenses, manage lendings, set savings goals, and get AI-powered insights — all offline, all private.
-
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-▶%20Open%20App-6C63FF?style=for-the-badge&logo=vercel)](https://spendsense-acp044rkq-akshay-jadhavs-projects-b3a18432.vercel.app)
-[![PWA Ready](https://img.shields.io/badge/PWA-Installable-51CF66?style=for-the-badge&logo=googlechrome)](#-install-on-mobile)
-[![Made with React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38BDF8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com)
-
-</div>
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel)](https://spendsense-akshay-jadhavs-projects-b3a18432.vercel.app)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite)](https://vitejs.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38BDF8?logo=tailwindcss)](https://tailwindcss.com)
+[![PWA](https://img.shields.io/badge/PWA-Ready-blueviolet?logo=googlechrome)](https://web.dev/progressive-web-apps/)
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
-|---|---|
-| 📊 **Dashboard** | Spending streak, budget progress bar, 7-day sparkline chart, recent activity feed |
-| 💳 **Expense Tracker** | Add/delete expenses with category, photo receipt, date. Swipe-to-delete, bulk delete, month navigation |
-| 🤝 **Lend Tracker** | Track who owes you money. Partial returns, overdue alerts, WhatsApp reminder integration |
-| 📈 **Summary & Analytics** | 6-month trend chart, category bar chart, MoM comparison, personalized insights |
-| 🤖 **AI Chat** | Rule-based local AI that analyzes your spending and answers natural language finance questions |
-| 🎯 **Savings Goals** | Set goals with emoji, target amount, deadline, and color. Add funds progressively |
-| 🔁 **Recurring Expenses** | Schedule daily/weekly/monthly expenses — auto-added when due |
-| 🌙 **Dark Mode** | Full dark theme with custom CSS design token system |
-| 📤 **Export / Import** | Backup your data as JSON. Restore it anytime on any device |
-| 📱 **PWA** | Installable on Android & iPhone. Works fully offline after install |
+### 🏠 Home Tab
+- Personalized greeting with current month spending
+- Live budget progress bar with daily allowance
+- 6-month spending sparkline chart
+- Daily streak tracker
+- Quick-access recent transactions
+- Pending lendings summary card
+
+### 💳 Expenses Tab
+- Add expenses with category, amount, description, date & receipt photo
+- Month navigator with category filter chips
+- Search and sort (newest / oldest / highest)
+- Swipe-to-delete and bulk select/delete
+- Fullscreen receipt viewer (React Portal-based)
+
+### 🤝 Lend Tab
+- Lending ledger with pending / partial / repaid status
+- Record partial or full repayments with payment history
+- Expandable payment history per lending card
+- Confirm full repayment with undo support
+- WhatsApp remind button for borrowers
+- Contact picker integration (mobile)
+
+### 📊 Summary Tab
+- Monthly stats grid (total, average, highest, transactions)
+- Category bar chart with percentage breakdown
+- 6-month SVG line chart with trend indicator
+- AI-generated financial insights
+- Savings goals with progress bars and top-up modal
+
+### 🤖 AI Chat
+- Rule-based AI financial advisor with contextual insights
+- Quick-prompt chips (spending tips, saving goals, etc.)
+- Typing indicator animation
+
+### ⚙️ Settings Sheet
+- Name, currency symbol & budget configuration
+- Dark / light / system theme toggle
+- Recurring expenses management
+- Export (JSON) / Import / Clear data
+- App version display
 
 ---
 
-## 📱 Install on Mobile
-
-**The app works offline once installed — no internet needed.**
-
-### Android
-1. Open the [Live Demo](https://spendsense-acp044rkq-akshay-jadhavs-projects-b3a18432.vercel.app) in **Chrome**
-2. Tap ⋮ → **"Add to Home Screen"** → Install
-
-### iPhone
-1. Open the link in **Safari**
-2. Tap the **Share** icon (□↑) → **"Add to Home Screen"** → Add
-
----
-
-## 🛠️ Tech Stack
+## 🛠 Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Framework | [React 18](https://react.dev) + [Vite](https://vitejs.dev) |
-| Styling | [Tailwind CSS](https://tailwindcss.com) + Custom CSS tokens |
-| Icons | [Lucide React](https://lucide.dev) |
-| Storage | `localStorage` — 100% client-side, zero backend |
-| Hosting | [Vercel](https://vercel.com) |
-| PWA | Web App Manifest + Service Worker |
-
----
-
-## 🚀 Run Locally
-
-```bash
-# Clone the repo
-git clone https://github.com/akshayjadhav237237-cmd/spendsense.git
-cd spendsense
-
-# Install dependencies
-npm install
-
-# Start the dev server
-npm run dev
-```
-
-Open **http://localhost:5173** in your browser.
-
-### Run on your phone (same WiFi)
-```bash
-npm run dev -- --host
-# Then open http://<your-local-ip>:5173 on your phone
-```
+|-------|------------|
+| Framework | React 18 + Vite 6 |
+| Styling | Tailwind CSS 3 |
+| Icons | Lucide React |
+| Storage | `localStorage` (with `ss_` prefix) |
+| PWA | Custom Service Worker + Web App Manifest |
+| Android | Bubblewrap CLI (TWA) |
+| Deployment | Vercel |
 
 ---
 
@@ -88,40 +74,102 @@ npm run dev -- --host
 
 ```
 src/
-├── SpendSense.jsx          # App shell · state management · routing
-├── utils.js                # Constants · formatters · AI engine · hooks
-├── main.jsx                # Entry point · service worker registration
+├── SpendSense.jsx          # App shell, state hydration, ErrorBoundary
+├── main.jsx                # React root entry
+├── index.css               # Global + Tailwind
+├── utils.js                # Formatting, date, ID helpers
 ├── components/
-│   └── GlobalComponents.jsx  # BottomNav · OfflineBanner · Toast · BottomSheet
+│   └── GlobalComponents.jsx  # BottomSheet, BottomNav, ConfirmDialog, Toast
 └── views/
-    ├── HomeView.jsx          # Dashboard
-    ├── ExpensesView.jsx       # Expense CRUD
-    ├── LendView.jsx           # Lending tracker
-    ├── SummaryView.jsx        # Analytics & goals
-    ├── AiInsightsView.jsx     # AI chat
-    └── SettingsSheet.jsx      # Settings · recurring · import/export
+    ├── HomeView.jsx          # Home tab
+    ├── ExpensesView.jsx      # Expenses tab + AddExpenseModal
+    ├── LendView.jsx          # Lend tab + AddLendModal + PartialReturnModal
+    ├── SummaryView.jsx       # Summary tab + AddGoalModal
+    ├── AiInsightsView.jsx    # AI Chat tab
+    └── SettingsSheet.jsx     # Settings bottom sheet
 public/
-├── manifest.json           # PWA manifest
-├── sw.js                   # Service worker (offline caching)
-├── icon-192.png            # App icon
-└── icon-512.png            # App icon (large)
+├── manifest.json            # PWA manifest
+├── sw.js                    # Service worker (offline cache)
+├── icon-192.png             # PWA icon
+├── icon-512.png             # PWA icon
+└── .well-known/
+    └── assetlinks.json      # Digital Asset Links (Android TWA)
 ```
 
 ---
 
-## 🔒 Privacy
+## 🚀 Getting Started
 
-SpendSense stores **all data locally in your browser** using `localStorage`.  
-No servers. No accounts. No data leaves your device.
+### Prerequisites
+- Node.js 18+
+- npm 9+
+
+### Run Locally
+
+```bash
+git clone https://github.com/akshayjadhav237237/spendsense.git
+cd spendsense
+npm install
+npm run dev
+```
+
+App runs at `http://localhost:5173`
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+---
+
+## 📱 Android APK
+
+SpendSense ships as a **TWA (Trusted Web Activity)** Android app built with [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap).
+
+### Build the APK yourself
+
+```bash
+# Install Bubblewrap
+npm install -g @bubblewrap/cli
+
+# Initialize (downloads JDK + Android SDK automatically)
+mkdir spendsense-apk && cd spendsense-apk
+bubblewrap init --manifest https://spendsense-akshay-jadhavs-projects-b3a18432.vercel.app/manifest.json
+
+# Build signed APK + AAB
+bubblewrap build
+```
+
+Output files:
+- `app-release-signed.apk` — install directly on Android
+- `app-release-bundle.aab` — submit to Google Play Store
+
+### Digital Asset Links
+The `/.well-known/assetlinks.json` is deployed on Vercel to verify domain ownership and **hide the browser URL bar** in the TWA.
+
+---
+
+## 🧠 Key Design Decisions
+
+| Decision | Reason |
+|----------|--------|
+| `localStorage` only | Zero backend — works fully offline |
+| React class `ErrorBoundary` | Catches rendering crashes → shows recovery screen instead of blank page |
+| `try/catch` on all form submits | Prevents state corruption on bad input |
+| Object maps for toggle state (`expandedItems`, `swipedItems`) | Avoids illegal `useState` inside `.map()` (Rules of Hooks) |
+| React Portal for receipt viewer | Bypasses CSS stacking context issues from bottom sheets |
+
+---
+
+## 🌐 Deployment
+
+Deployed on **Vercel** with automatic production builds.
+
+🔗 **Live URL:** https://spendsense-akshay-jadhavs-projects-b3a18432.vercel.app
 
 ---
 
 ## 📄 License
 
-MIT © [Akshay Jadhav](https://github.com/akshayjadhav237237-cmd)
-
----
-
-<div align="center">
-  Made with ❤️ for students who actually want to know where their money went.
-</div>
+MIT © Akshay Jadhav
