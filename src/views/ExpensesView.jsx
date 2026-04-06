@@ -251,15 +251,15 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
                     <p className="text-sm font-medium text-gray-800 truncate">{exp.desc||exp.category}</p>
                     <p className="text-xs text-gray-400">{exp.category}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <p className="text-sm font-semibold text-[#FF6B6B]">-{formatCurr(exp.amount,sym)}</p>
                     {exp.photo && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setViewingReceipt(exp.photo); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingReceipt(exp.photo); }}
                         aria-label="View receipt"
-                        className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                        className="flex items-center gap-1.5 mt-0.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-bold active:scale-95 transition-transform border border-indigo-100 shadow-sm"
                       >
-                        <Camera size={14} />
+                        <Camera size={12} /> View Receipt
                       </button>
                     )}
                   </div>
