@@ -70,28 +70,45 @@ export const Toast = ({ toast }) => {
 };
 
 /* ─── Bottom Sheet ───────────────────────────────────────────────────────── */
-export const BottomSheet = ({ isOpen, onClose, title, children, noPad }) => {
-  const ref = useRef(null);
-  useFocusTrap(ref, isOpen);
+export const BottomSheet = ({ isOpen, onClose, title, children }) => {
+  const sheetRef = useRef(null);
+  useFocusTrap(sheetRef, isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
-    const h = (e) => e.key === 'Escape' && onClose?.();
-    document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
+    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
-      <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={onClose} />
-      <div ref={ref} className="absolute bottom-0 left-0 right-0 w-full bg-white rounded-t-3xl animate-slide-up pb-safe ss-bottom-sheet ss-text flex flex-col">
-        <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mt-3 mb-1 ss-drag-handle shrink-0" />
-        <div className="flex items-center justify-between py-3 px-5 shrink-0">
-          <h2 id="sheet-title" className="font-semibold text-lg text-gray-900 ss-text">{title}</h2>
-          <button onClick={onClose} aria-label="Close modal" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 ss-chip-inactive"><X size={16} /></button>
-        </div>
-        <div className={`overflow-y-auto max-h-[85vh] ${noPad ? 'pb-32' : 'px-5 pb-32'}`}>
-          {children}
-        </div>
+    <div className="fixed inset-0 z-50 max-w-[430px] mx-auto">
+      <div
+        className="absolute inset-0 bg-black/40 animate-fade-in"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div
+        ref={sheetRef}
+        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl animate-slide-up ss-bottom-sheet ss-text"
+        style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: '120px' }}
+      >
+        <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mt-3 mb-4 ss-drag-handle" />
+        {title && (
+          <div className="flex items-center justify-between px-4 mb-4">
+            <h2 className="font-semibold text-base ss-text">{title}</h2>
+            <button
+              onClick={onClose}
+              aria-label="Close modal"
+              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        {children}
       </div>
     </div>
   );
