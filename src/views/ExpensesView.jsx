@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Search, X, Camera, Trash2, CheckSquare, Square, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Camera, Trash2, CheckSquare, Square, Download, Pencil } from 'lucide-react';
 import { CATEGORIES, formatCurr, getMonthKey, getCurrentMonthKey, getTodayISO, getRelativeDateLabel, parseAmount, generateId } from '../utils.js';
 import { BottomSheet, ConfirmDialog } from '../components/GlobalComponents.jsx';
 
@@ -122,7 +122,7 @@ function AddExpenseModal({ isOpen, onClose, onAdd, settings, showToast }) {
   );
 }
 
-export default function ExpensesView({ settings, expenses, setExpenses, showToast }) {
+export default function ExpensesView({ settings, expenses, setExpenses, showToast, openEditExpense }) {
   const sym = settings.currency;
   const [viewMonth, setViewMonth] = useState(getCurrentMonthKey());
   const [activeCategory, setActiveCategory] = useState('All');
@@ -258,15 +258,24 @@ export default function ExpensesView({ settings, expenses, setExpenses, showToas
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <p className="text-sm font-semibold text-[#FF6B6B]">-{formatCurr(exp.amount,sym)}</p>
-                    {exp.photo && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {exp.photo && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingReceipt(exp.photo); }}
+                          aria-label="View receipt"
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-bold active:scale-95 transition-transform border border-indigo-100 shadow-sm"
+                        >
+                          <Camera size={12} /> View Receipt
+                        </button>
+                      )}
                       <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingReceipt(exp.photo); }}
-                        aria-label="View receipt"
-                        className="flex items-center gap-1.5 mt-0.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-bold active:scale-95 transition-transform border border-indigo-100 shadow-sm"
+                        onClick={(e) => { e.stopPropagation(); openEditExpense?.(exp); }}
+                        aria-label="Edit expense"
+                        className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
                       >
-                        <Camera size={12} /> View Receipt
+                        <Pencil size={13} />
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
                 <button onClick={e=>{e.stopPropagation();setDeleteId(exp.id);}} aria-label="Delete expense"

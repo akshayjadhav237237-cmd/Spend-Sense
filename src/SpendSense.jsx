@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { OfflineBanner, Toast, BottomNav } from './components/GlobalComponents.jsx';
+import { OfflineBanner, Toast, BottomNav, BottomSheet } from './components/GlobalComponents.jsx';
 import HomeView from './views/HomeView.jsx';
 import ExpensesView from './views/ExpensesView.jsx';
 import LendView from './views/LendView.jsx';
 import SummaryView from './views/SummaryView.jsx';
 import AiInsightsView from './views/AiInsightsView.jsx';
 import SettingsSheet from './views/SettingsSheet.jsx';
-import { getTodayISO, generateId } from './utils.js';
+import { getTodayISO, generateId, CATEGORIES } from './utils.js';
+import { Camera, X, Pencil } from 'lucide-react';
 
 const DEFAULT_SETTINGS = { name:'Student', currency:'₹', theme:'light', budgetLimit:0, weeklyDigest:false, haptics:true };
 
@@ -50,6 +51,16 @@ function SpendSenseApp() {
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Edit Expense
+  const [showEditExpenseModal, setShowEditExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [editExpenseForm, setEditExpenseForm] = useState({ amount: '', category: '', desc: '', date: '', photo: null });
+
+  // Edit Lending
+  const [showEditLendModal, setShowEditLendModal] = useState(false);
+  const [editingLend, setEditingLend] = useState(null);
+  const [editLendForm, setEditLendForm] = useState({ name: '', phone: '', amount: '', reason: '', date: '' });
+
   const showToast = useCallback((msg, type = 'info') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -87,6 +98,47 @@ function SpendSenseApp() {
     }
   }, []);
 
+  const handleEditExpense = () => {
+    try {
+      const amt = parseFloat(editExpenseForm.amount);
+      if (!amt || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
+      if (!editExpenseForm.category) { showToast('Select a category', 'error'); return; }
+      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? {
+        ...e, amount: amt, category: editExpenseForm.category,
+        desc: editExpenseForm.desc, date: editExpenseForm.date, photo: editExpenseForm.photo || null
+      } : e));
+      setShowEditExpenseModal(false); setEditingExpense(null);
+      showToast('Expense updated!', 'success');
+    } catch (err) { showToast('Something went wrong', 'error'); }
+  };
+
+  const openEditExpense = (expense) => {
+    setEditingExpense(expense);
+    setEditExpenseForm({ amount: expense.amount.toString(), category: expense.category, desc: expense.desc, date: expense.date, photo: expense.photo || null });
+    setShowEditExpenseModal(true);
+  };
+
+  const handleEditLend = () => {
+    try {
+      const amt = parseFloat(editLendForm.amount);
+      if (!amt || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
+      if (!editLendForm.name.trim()) { showToast('Enter a name', 'error'); return; }
+      setLendings(prev => prev.map(l => l.id === editingLend.id ? {
+        ...l, name: editLendForm.name.trim(), phone: editLendForm.phone.trim(),
+        amountOriginal: amt, amount: amt - (l.amountPaid || 0),
+        reason: editLendForm.reason.trim(), date: editLendForm.date
+      } : l));
+      setShowEditLendModal(false); setEditingLend(null);
+      showToast('Lending updated!', 'success');
+    } catch (err) { showToast('Something went wrong', 'error'); }
+  };
+
+  const openEditLend = (lend) => {
+    setEditingLend(lend);
+    setEditLendForm({ name: lend.name, phone: lend.phone || '', amount: lend.amountOriginal?.toString() || lend.amount.toString(), reason: lend.reason, date: lend.date });
+    setShowEditLendModal(true);
+  };
+
   const isDark = settings.theme === 'dark';
 
   const renderTab = () => {
@@ -95,9 +147,9 @@ function SpendSenseApp() {
       case 'home':
         return <HomeView {...common} expenses={expenses} lendings={lendings} setActiveTab={setActiveTab} setShowSettings={setShowSettings}/>;
       case 'expenses':
-        return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses}/>;
+        return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses} openEditExpense={openEditExpense}/>;
       case 'lend':
-        return <LendView {...common} lendings={lendings} setLendings={setLendings}/>;
+        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
@@ -178,6 +230,102 @@ function SpendSenseApp() {
           setExpenses={setExpenses} setLendings={setLendings} setSavingsGoals={setSavingsGoals}
           showToast={showToast}
         />
+
+        {/* Edit Expense Modal */}
+        <BottomSheet isOpen={showEditExpenseModal} onClose={() => { setShowEditExpenseModal(false); setEditingExpense(null); }} title="Edit Expense">
+          <div className="px-4 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Amount</label>
+              <div className="flex items-center bg-gray-50 rounded-xl px-3 ss-input">
+                <span className="text-gray-400 text-sm mr-1">{settings.currency}</span>
+                <input type="number" inputMode="decimal" className="flex-1 bg-transparent py-3 text-sm outline-none"
+                  value={editExpenseForm.amount} onChange={e => setEditExpenseForm(p => ({ ...p, amount: e.target.value }))} autoFocus/>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Category</label>
+              <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+                {CATEGORIES.map(cat => (
+                  <button key={cat.name} onClick={() => setEditExpenseForm(p => ({ ...p, category: cat.name }))}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-all duration-200 border ${editExpenseForm.category === cat.name ? 'bg-[#6C63FF] text-white border-[#6C63FF]' : 'bg-white text-gray-600 border-gray-100 ss-chip-inactive'}`}>
+                    <span>{cat.emoji}</span><span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Description</label>
+              <input type="text" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editExpenseForm.desc} onChange={e => setEditExpenseForm(p => ({ ...p, desc: e.target.value }))} placeholder="What was this for?" maxLength={60}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Date</label>
+              <input type="date" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editExpenseForm.date} max={getTodayISO()} onChange={e => setEditExpenseForm(p => ({ ...p, date: e.target.value }))}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Receipt Photo</label>
+              <div className="flex gap-2 items-center">
+                {editExpenseForm.photo && <img src={editExpenseForm.photo} alt="Receipt preview" className="w-14 h-14 rounded-xl object-cover border border-gray-100"/>}
+                <label className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-500 cursor-pointer active:scale-95 transition-transform ss-input">
+                  <Camera size={16}/>{editExpenseForm.photo ? 'Change Photo' : 'Add Receipt'}
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => {
+                    const file = e.target.files[0]; if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setEditExpenseForm(p => ({ ...p, photo: ev.target.result }));
+                    reader.readAsDataURL(file);
+                  }}/>
+                </label>
+                {editExpenseForm.photo && (
+                  <button onClick={() => setEditExpenseForm(p => ({ ...p, photo: null }))}
+                    className="w-9 h-9 rounded-xl bg-red-50 text-red-400 flex items-center justify-center active:scale-95 transition-transform" aria-label="Remove photo">
+                    <X size={16}/>
+                  </button>
+                )}
+              </div>
+            </div>
+            <button onClick={handleEditExpense} className="w-full py-3.5 rounded-2xl bg-[#6C63FF] text-white font-semibold text-sm active:scale-95 transition-transform">
+              Save Changes
+            </button>
+          </div>
+        </BottomSheet>
+
+        {/* Edit Lending Modal */}
+        <BottomSheet isOpen={showEditLendModal} onClose={() => { setShowEditLendModal(false); setEditingLend(null); }} title="Edit Lending">
+          <div className="px-4 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Name</label>
+              <input type="text" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editLendForm.name} onChange={e => setEditLendForm(p => ({ ...p, name: e.target.value }))} placeholder="Borrower name" autoFocus/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Phone (optional)</label>
+              <input type="tel" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editLendForm.phone} onChange={e => setEditLendForm(p => ({ ...p, phone: e.target.value }))} placeholder="+91 XXXXX XXXXX"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Original Amount</label>
+              <div className="flex items-center bg-gray-50 rounded-xl px-3 ss-input">
+                <span className="text-gray-400 text-sm mr-1">{settings.currency}</span>
+                <input type="number" inputMode="decimal" className="flex-1 bg-transparent py-3 text-sm outline-none"
+                  value={editLendForm.amount} onChange={e => setEditLendForm(p => ({ ...p, amount: e.target.value }))} placeholder="0"/>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Reason</label>
+              <input type="text" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editLendForm.reason} onChange={e => setEditLendForm(p => ({ ...p, reason: e.target.value }))} placeholder="What was the money for?" maxLength={60}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Date</label>
+              <input type="date" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
+                value={editLendForm.date} max={getTodayISO()} onChange={e => setEditLendForm(p => ({ ...p, date: e.target.value }))}/>
+            </div>
+            <button onClick={handleEditLend} className="w-full py-3.5 rounded-2xl bg-[#4ECDC4] text-white font-semibold text-sm active:scale-95 transition-transform">
+              Save Changes
+            </button>
+          </div>
+        </BottomSheet>
       </div>
     </>
   );

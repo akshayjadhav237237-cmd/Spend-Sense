@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil } from 'lucide-react';
 import { formatCurr, getRelativeDateLabel, getTodayISO, parseAmount, generateId, avatarColor, getInitials } from '../utils.js';
 import { BottomSheet, ConfirmDialog, useContactPicker } from '../components/GlobalComponents.jsx';
 
@@ -137,7 +137,7 @@ function PartialReturnModal({ isOpen, lend, onClose, onConfirm, sym }) {
   );
 }
 
-export default function LendView({ settings, lendings, setLendings, showToast }) {
+export default function LendView({ settings, lendings, setLendings, showToast, openEditLend }) {
   const sym = settings.currency;
   const [lendFilter,setLendFilter]=useState('pending');
   const [showAdd,setShowAdd]=useState(false);
@@ -246,7 +246,10 @@ export default function LendView({ settings, lendings, setLendings, showToast })
         const expanded = expandedPayments[lend.id] || false;
         return (
           <div key={lend.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card relative">
-            <button onClick={()=>setDeleteId(lend.id)} aria-label="Delete lending" className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 active:scale-95 transition-transform"><Trash2 size={14}/></button>
+            <div className="absolute top-2 right-2 flex gap-1">
+              <button onClick={() => openEditLend?.(lend)} aria-label="Edit lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-400 active:scale-95 transition-transform"><Pencil size={13}/></button>
+              <button onClick={() => setDeleteId(lend.id)} aria-label="Delete lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 active:scale-95 transition-transform"><Trash2 size={14}/></button>
+            </div>
             <div className="flex items-start gap-3">
               <div className="w-11 h-11 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 font-semibold text-sm flex-shrink-0" style={{background:avatarColor(lend.name)}}>
                 {getInitials(lend.name)}
