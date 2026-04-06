@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, Trash2, Pencil } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil, MessageSquare, Copy } from 'lucide-react';
 import { formatCurr, getRelativeDateLabel, getTodayISO, parseAmount, generateId, avatarColor, getInitials } from '../utils.js';
 import { BottomSheet, ConfirmDialog, useContactPicker } from '../components/GlobalComponents.jsx';
 
@@ -148,6 +148,9 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
   const [paymentTarget, setPaymentTarget] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', date: getTodayISO(), note: '' });
 
+  const [showRemindOptions, setShowRemindOptions] = useState(false);
+  const [remindTarget, setRemindTarget] = useState(null);
+
   const pendingCount=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').length,[lendings]);
   const returnedCount=useMemo(()=>lendings.filter(l=>l.status==='returned').length,[lendings]);
   const pendingTotal=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(parseFloat(l.amount)||0),0),[lendings]);
@@ -189,13 +192,22 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
 
   const remindLending = (lend) => {
     const paid = lend.amountPaid || 0;
-    const original = lend.amountOriginal || lend.amount;
+    const original = lend.amountOriginal || parseFloat(lend.amount);
     const remaining = original - paid;
     const text = paid > 0
-      ? `Hey ${lend.name}! 👋 You borrowed ${sym}${original} from me on ${getRelativeDateLabel(lend.date)}${lend.reason?` for '${lend.reason}'`:''}. You've returned ${sym}${paid.toFixed(2)} so far — ${sym}${remaining.toFixed(2)} is still pending. Please return it when you can! 😊`
-      : `Hey ${lend.name}! 👋 Friendly reminder — you borrowed ${sym}${original} from me on ${getRelativeDateLabel(lend.date)}${lend.reason?` for '${lend.reason}'`:''}. Please return it when you can! 😊`;
-    if (lend.phone) { window.open(`https://wa.me/${lend.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(text)}`, '_blank'); }
-    else { navigator.clipboard.writeText(text).then(() => showToast('Message copied!', 'success')); }
+      ? `Hey ${lend.name}! 👋 You borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. You've returned ${sym}${paid.toFixed(2)} so far — ${sym}${remaining.toFixed(2)} is still pending. Please return it when you can! 😊`
+      : `Hey ${lend.name}! 👋 Friendly reminder — you borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. Please return it when you can! 😊`;
+
+    if (lend.phone) {
+      const phone = lend.phone.replace(/[^\d+]/g, '');
+      // Show choice dialog between WhatsApp and SMS
+      setRemindTarget({ lend, text, phone });
+      setShowRemindOptions(true);
+    } else {
+      navigator.clipboard.writeText(text)
+        .then(() => showToast('Message copied to clipboard!', 'success'))
+        .catch(() => showToast('Could not copy message', 'error'));
+    }
   };
 
   const remindAll=()=>{
@@ -399,6 +411,68 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
       </BottomSheet>
 
       <ConfirmDialog isOpen={!!deleteId} title="Delete Lending?" message="This cannot be undone." confirmLabel="Delete" confirmColor="#FF6B6B" onConfirm={()=>deleteLend(deleteId)} onCancel={()=>setDeleteId(null)}/>
+
+      {showRemindOptions && remindTarget && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-end max-w-[430px] mx-auto" onClick={() => setShowRemindOptions(false)}>
+          <div className="bg-white w-full rounded-t-3xl p-6 ss-bottom-sheet" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-5 ss-drag-handle" />
+            <h3 className="font-semibold text-base text-gray-800 ss-text mb-1">Remind {remindTarget.lend.name}</h3>
+            <p className="text-xs text-gray-400 ss-text-muted mb-5">Choose how to send the reminder</p>
+
+            <button
+              onClick={() => {
+                window.open(`https://wa.me/${remindTarget.phone}?text=${encodeURIComponent(remindTarget.text)}`, '_blank');
+                setShowRemindOptions(false);
+                showToast('Opening WhatsApp...', 'info');
+              }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-green-50 border border-green-100 mb-3 active:scale-95 transition-transform"
+            >
+              <div className="w-11 h-11 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.554 4.103 1.523 5.824L.057 23.882a.5.5 0 00.613.613l6.058-1.466A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.878 9.878 0 01-5.032-1.378l-.36-.214-3.733.904.92-3.625-.235-.373A9.865 9.865 0 012.106 12C2.106 6.533 6.533 2.106 12 2.106S21.894 6.533 21.894 12 17.467 21.894 12 21.894z"/></svg>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm text-gray-800 ss-text">Send via WhatsApp</p>
+                <p className="text-xs text-gray-400 ss-text-muted">Opens WhatsApp — tap Send once</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                window.open(`sms:${remindTarget.phone}?body=${encodeURIComponent(remindTarget.text)}`, '_self');
+                setShowRemindOptions(false);
+                showToast('Opening SMS...', 'info');
+              }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-blue-50 border border-blue-100 mb-3 active:scale-95 transition-transform"
+            >
+              <div className="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                <MessageSquare size={20} color="white" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm text-gray-800 ss-text">Send via SMS</p>
+                <p className="text-xs text-gray-400 ss-text-muted">Opens messages app — tap Send once</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(remindTarget.text)
+                  .then(() => showToast('Message copied!', 'success'))
+                  .catch(() => showToast('Could not copy', 'error'));
+                setShowRemindOptions(false);
+              }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 active:scale-95 transition-transform"
+            >
+              <div className="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center flex-shrink-0">
+                <Copy size={20} color="white" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm text-gray-800 ss-text">Copy Message</p>
+                <p className="text-xs text-gray-400 ss-text-muted">Paste anywhere manually</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
