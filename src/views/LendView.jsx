@@ -16,24 +16,29 @@ function AddLendModal({ isOpen, onClose, onAdd, settings, lendings, showToast })
 
   const reset=()=>{setName('');setPhone('');setAmount('');setReason('');setDate(getTodayISO());setAmtErr(false);setNameErr(false);};
   const submit=()=>{
-    let err=false;
-    if(!name.trim()){setNameErr(true);err=true;}else setNameErr(false);
-    const amt=parseAmount(amount); if(!amt){setAmtErr(true);err=true;}else setAmtErr(false);
-    if(err) return;
-    onAdd({
-      id: generateId(),
-      name: name.trim(),
-      phone: phone.trim(),
-      amountOriginal: parseFloat(amt),
-      amountPaid: 0,
-      payments: [],
-      amount: amt,
-      reason: reason.trim(),
-      date,
-      status: 'pending',
-      createdAt: Date.now()
-    });
-    reset(); onClose();
+    try {
+      let err=false;
+      if(!name.trim()){setNameErr(true);err=true;}else setNameErr(false);
+      const amt=parseAmount(amount); if(!amt){setAmtErr(true);err=true;}else setAmtErr(false);
+      if(err) return;
+      onAdd({
+        id: generateId(),
+        name: name.trim(),
+        phone: phone.trim(),
+        amountOriginal: parseFloat(amt),
+        amountPaid: 0,
+        payments: [],
+        amount: amt,
+        reason: reason.trim(),
+        date,
+        status: 'pending',
+        createdAt: Date.now()
+      });
+      reset(); onClose();
+    } catch(err) {
+      console.error('Add lending error:', err);
+      showToast?.('Something went wrong. Try again.', 'error');
+    }
   };
 
   const { pickContact } = useContactPicker(

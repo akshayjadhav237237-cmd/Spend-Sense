@@ -28,7 +28,7 @@ function nextDueDateCalc(freq, from) {
   return d.toISOString().slice(0,10);
 }
 
-export default function SpendSenseApp() {
+function SpendSenseApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [settings, setSettings] = useState(() => safeLoad('ss_settings', DEFAULT_SETTINGS));
   const [expenses, setExpenses] = useState(() => {
@@ -182,3 +182,35 @@ export default function SpendSenseApp() {
     </>
   );
 }
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(err, info) { console.error('SpendSense crash:', err, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="max-w-[430px] mx-auto min-h-screen flex flex-col items-center justify-center p-8 bg-[#F8F9FF]">
+          <p className="text-4xl mb-4">💸</p>
+          <h2 className="font-semibold text-lg text-gray-800 mb-2">Something went wrong</h2>
+          <p className="text-sm text-gray-400 text-center mb-6">{this.state.error?.message || 'Unknown error'}</p>
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium active:scale-95 transition-transform"
+          >
+            Reset App &amp; Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const App = () => (
+  <ErrorBoundary>
+    <SpendSenseApp />
+  </ErrorBoundary>
+);
+
+export default App;

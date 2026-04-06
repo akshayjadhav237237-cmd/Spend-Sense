@@ -52,13 +52,18 @@ function AddExpenseModal({ isOpen, onClose, onAdd, settings, showToast }) {
   };
 
   const submit = () => {
-    const amt = parseAmount(amount);
-    let err = false;
-    if(!amt){setAmtErr(true);err=true;} else setAmtErr(false);
-    if(!category){setCatErr(true);err=true;} else setCatErr(false);
-    if(err) return;
-    onAdd({ id:generateId(), amount:amt, category, desc:desc.trim(), date, photo, createdAt:Date.now() });
-    onClose();
+    try {
+      const amt = parseAmount(amount);
+      let err = false;
+      if(!amt){setAmtErr(true);err=true;} else setAmtErr(false);
+      if(!category){setCatErr(true);err=true;} else setCatErr(false);
+      if(err) return;
+      onAdd({ id:generateId(), amount:amt, category, desc:desc.trim(), date, photo, createdAt:Date.now() });
+      onClose();
+    } catch(err) {
+      console.error('Add expense error:', err);
+      showToast?.('Something went wrong. Try again.', 'error');
+    }
   };
 
   return (
