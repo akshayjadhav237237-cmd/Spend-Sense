@@ -12,7 +12,7 @@ export default function HomeView({ settings, expenses, lendings, setActiveTab, s
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
   const monthlyTotal = useMemo(() => expenses.filter(e => getMonthKey(e.date) === mk).reduce((s, e) => s + e.amount, 0), [expenses, mk]);
-  const pendingTotal = useMemo(() => lendings.filter(l => l.status === 'pending').reduce((s, l) => s + l.amount, 0), [lendings]);
+  const pendingTotal = useMemo(() => lendings.filter(l => l.status === 'pending' || l.status === 'partial').reduce((s, l) => s + (parseFloat(l.amount) || 0), 0), [lendings]);
 
   const budgetPct = useMemo(() => getBudgetPercent(expenses, settings.budgetLimit), [expenses, settings.budgetLimit]);
   const budgetColor = budgetPct < 70 ? '#51CF66' : budgetPct < 90 ? '#FFD93D' : '#FF6B6B';

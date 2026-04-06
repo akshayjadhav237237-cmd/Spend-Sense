@@ -6,7 +6,7 @@ import { BottomSheet } from '../components/GlobalComponents.jsx';
 const GOAL_EMOJIS = ['🎯','🏠','✈️','💻','📱','🎓','🚗','💍','🏋️','🎸','📚','💰'];
 const GOAL_COLORS = ['#6C63FF','#FF6B6B','#4ECDC4','#51CF66','#FFD93D','#FF8E53'];
 
-function AddGoalModal({ isOpen, onClose, onAdd }) {
+function AddGoalModal({ isOpen, onClose, onAdd, sym }) {
   const [title,setTitle]=useState(''); const [target,setTarget]=useState('');
   const [current,setCurrent]=useState('0'); const [emoji,setEmoji]=useState('🎯');
   const [deadline,setDeadline]=useState(''); const [color,setColor]=useState(GOAL_COLORS[0]);
@@ -32,12 +32,12 @@ function AddGoalModal({ isOpen, onClose, onAdd }) {
         </div>
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="goal-target">Target ₹</label>
+            <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="goal-target">Target {sym}</label>
             <input id="goal-target" type="number" inputMode="decimal" value={target} onChange={e=>setTarget(e.target.value)} placeholder="10000"
               className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"/>
           </div>
           <div className="flex-1">
-            <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="goal-current">Saved So Far ₹</label>
+            <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="goal-current">Saved So Far {sym}</label>
             <input id="goal-current" type="number" inputMode="decimal" value={current} onChange={e=>setCurrent(e.target.value)} placeholder="0"
               className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"/>
           </div>
@@ -69,9 +69,9 @@ export default function SummaryView({ settings, expenses, lendings, savingsGoals
   const prevExp = useMemo(()=>expenses.filter(e=>getMonthKey(e.date)===prevMk),[expenses,prevMk]);
   const monthTotal = useMemo(()=>monthExp.reduce((s,e)=>s+e.amount,0),[monthExp]);
   const prevTotal = useMemo(()=>prevExp.reduce((s,e)=>s+e.amount,0),[prevExp]);
-  const totalLentAll = useMemo(()=>lendings.reduce((s,l)=>s+l.amount,0),[lendings]);
-  const recovered = useMemo(()=>lendings.filter(l=>l.status==='returned').reduce((s,l)=>s+l.amount,0),[lendings]);
-  const stillOwed = useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(l.amountRemaining??l.amount),0),[lendings]);
+  const totalLentAll = useMemo(()=>lendings.reduce((s,l)=>s+(l.amountOriginal||parseFloat(l.amount)||0),0),[lendings]);
+  const recovered = useMemo(()=>lendings.filter(l=>l.status==='returned').reduce((s,l)=>s+(l.amountOriginal||parseFloat(l.amount)||0),0),[lendings]);
+  const stillOwed = useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(parseFloat(l.amount)||0),0),[lendings]);
 
   const catTotals = useMemo(()=>{
     const m={};
@@ -94,11 +94,14 @@ export default function SummaryView({ settings, expenses, lendings, savingsGoals
 
   const maxMonthly = useMemo(()=>Math.max(...last6Months.map(m=>m.total),1),[last6Months]);
   const SVG_W=300, SVG_H=80;
-  const points = last6Months.map((m,i)=>({
-    x: (i/(last6Months.length-1))*(SVG_W-20)+10,
-    y: SVG_H-10-((m.total/maxMonthly)*(SVG_H-20)),
-    total:m.total, label:m.label
-  }));
+  const points = last6Months.map((m,i)=>{
+    const xFraction = last6Months.length > 1 ? i/(last6Months.length-1) : 0.5;
+    return {
+      x: xFraction*(SVG_W-20)+10,
+      y: SVG_H-10-((m.total/maxMonthly)*(SVG_H-20)),
+      total:m.total, label:m.label
+    };
+  });
   const polyline = points.map(p=>`${p.x},${p.y}`).join(' ');
 
   const topCat = catTotals.sort((a,b)=>b.total-a.total)[0];
@@ -240,7 +243,7 @@ export default function SummaryView({ settings, expenses, lendings, savingsGoals
         })}
       </div>
 
-      <AddGoalModal isOpen={showGoalModal} onClose={()=>setShowGoalModal(false)} onAdd={(g)=>{setSavingsGoals(p=>[...p,g]);showToast('Goal added!','success');}}/>
+      <AddGoalModal isOpen={showGoalModal} onClose={()=>setShowGoalModal(false)} sym={sym} onAdd={(g)=>{setSavingsGoals(p=>[...p,g]);showToast('Goal added!','success');}}/>
 
       {addFundsGoal&&(
         <BottomSheet isOpen={!!addFundsGoal} onClose={()=>setAddFundsGoal(null)} title={`Add Funds — ${addFundsGoal.title}`}>
