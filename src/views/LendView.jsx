@@ -187,53 +187,46 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
     }
   };
 
-  const remindLending = async (lend) => {
-    const paid = lend.amountPaid || 0;
-    const original = lend.amountOriginal || parseFloat(lend.amount);
-    const remaining = original - paid;
-    const text = paid > 0
-      ? `Hey ${lend.name}! You borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. You've returned ${sym}${paid.toFixed(2)} so far — ${sym}${remaining.toFixed(2)} is still pending. Please return it when you can!`
-      : `Hey ${lend.name}! Friendly reminder — you borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. Please return it when you can!`;
+  const remindLending = (lend) => {
+    try {
+      const paid = lend.amountPaid || 0;
+      const original = lend.amountOriginal || parseFloat(lend.amount) || 0;
+      const remaining = original - paid;
+      const text = paid > 0
+        ? `Hey ${lend.name}! You borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. You've returned ${sym}${paid.toFixed(2)} so far — ${sym}${remaining.toFixed(2)} is still pending. Please return it when you can!`
+        : `Hey ${lend.name}! Friendly reminder — you borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. Please return it when you can!`;
 
-    if (lend.phone) {
-      const phone = lend.phone.replace(/[^\d]/g, '').slice(-10);
-      if (phone.length < 10) {
-        navigator.clipboard.writeText(text).then(() => showToast('Invalid phone — message copied instead', 'info'));
-        return;
-      }
-      showToast(`Sending reminder to ${lend.name}...`, 'info');
-      try {
-        const res = await fetch('/api/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, message: text })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`✅ Reminder sent to ${lend.name}!`, 'success');
+      if (lend.phone) {
+        const phone = lend.phone.replace(/[^\d]/g, '').slice(-10);
+        window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(text)}`, '_blank');
+      } else {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text)
+            .then(() => showToast('Message copied to clipboard!', 'success'))
+            .catch(() => showToast('Could not copy message', 'error'));
         } else {
-          throw new Error(data.error || 'Failed');
+          showToast('No phone number saved for this contact', 'info');
         }
-      } catch (err) {
-        showToast(`SMS failed — opening WhatsApp instead`, 'error');
-        setTimeout(() => {
-          window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(text)}`, '_blank');
-        }, 1500);
       }
-    } else {
-      navigator.clipboard.writeText(text)
-        .then(() => showToast('No phone saved — message copied!', 'info'))
-        .catch(() => showToast('Could not copy message', 'error'));
+    } catch (err) {
+      console.error('remindLending error:', err);
+      showToast('Could not send reminder', 'error');
     }
   };
 
   const remindAll = () => {
-    const pending = lendings.filter(l => l.status === 'pending' || l.status === 'partial');
-    if (pending.length === 0) { showToast('No pending lendings!', 'error'); return; }
-    pending.forEach((lend, index) => {
-      setTimeout(() => remindLending(lend), index * 2000);
-    });
-    showToast(`Sending ${pending.length} reminders...`, 'info');
+    try {
+      const pending = lendings.filter(l => l.status === 'pending' || l.status === 'partial');
+      if (pending.length === 0) { showToast('No pending lendings!', 'error'); return; }
+      pending.forEach((lend, index) => {
+        setTimeout(() => {
+          try { remindLending(lend); } catch (e) { console.error(e); }
+        }, index * 2000);
+      });
+      showToast(`Sending ${pending.length} reminders...`, 'info');
+    } catch (err) {
+      showToast('Could not send reminders', 'error');
+    }
   };
 
   const FILTER_TABS=[{id:'pending',label:'Pending',count:pendingCount},{id:'returned',label:'Returned',count:returnedCount},{id:'all',label:'All'}];
