@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { supabase } from './supabaseClient.js';
+import AuthPage from './components/AuthPage.jsx';
 import { OfflineBanner, Toast, BottomNav, BottomSheet } from './components/GlobalComponents.jsx';
 import HomeView from './views/HomeView.jsx';
 import ExpensesView from './views/ExpensesView.jsx';
@@ -355,10 +357,30 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const App = () => (
-  <ErrorBoundary>
-    <SpendSenseApp />
-  </ErrorBoundary>
-);
+const App = () => {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) return null;
+
+  return (
+    <ErrorBoundary>
+      {session ? <SpendSenseApp session={session} /> : <AuthPage />}
+    </ErrorBoundary>
+  );
+};
 
 export default App;
