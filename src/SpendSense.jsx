@@ -362,23 +362,41 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // If Supabase keys are missing or placeholder, skip auth entirely to prevent hanging the app on a blank screen
+    if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder')) {
+      console.warn('Supabase keys missing — running in local-only mode');
       setLoading(false);
-    });
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    try {
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          setSession(session);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Supabase session error:', err);
+          setLoading(false); // MUST set false to prevent permanent blank screen
+        });
 
-    return () => subscription.unsubscribe();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+      });
+
+      return () => subscription?.unsubscribe();
+    } catch (err) {
+      console.error('Supabase initialization failed:', err);
+      setLoading(false);
+    }
   }, []);
 
   if (loading) return null;
 
   return (
     <ErrorBoundary>
-      {session ? <SpendSenseApp session={session} /> : <AuthPage />}
+      {/* If authentication is bypassed (no session but running local-only), let them use the app normally */}
+      {(!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('placeholder') || session) ? <SpendSenseApp session={session} /> : <AuthPage />}
     </ErrorBoundary>
   );
 };
