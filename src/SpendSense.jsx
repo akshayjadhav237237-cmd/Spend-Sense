@@ -9,7 +9,7 @@ import SummaryView from './views/SummaryView.jsx';
 import AiInsightsView from './views/AiInsightsView.jsx';
 import SettingsSheet from './views/SettingsSheet.jsx';
 import { getTodayISO, generateId, CATEGORIES } from './utils.js';
-import { Camera, X, Pencil } from 'lucide-react';
+import { Home, Receipt, Handshake, BarChart2, Sparkles, Plus, Settings, X, ChevronDown, ChevronLeft, ChevronRight, Camera, Download, Pencil, Trash2, Check, AlertCircle, CheckCircle, Info, WifiOff, TrendingUp, TrendingDown, Minus, Lightbulb, Copy, MessageSquare, ContactRound, Send } from 'lucide-react';
 
 const DEFAULT_SETTINGS = { name:'Student', currency:'₹', theme:'light', budgetLimit:0, weeklyDigest:false, haptics:true };
 
@@ -33,21 +33,39 @@ function nextDueDateCalc(freq, from) {
 
 function SpendSenseApp() {
   const [activeTab, setActiveTab] = useState('home');
-  const [settings, setSettings] = useState(() => safeLoad('ss_settings', DEFAULT_SETTINGS));
+  const [settings, setSettings] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ss_settings');
+      if (!stored) return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0 };
+      const parsed = JSON.parse(stored);
+      return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0, ...parsed };
+    } catch (err) {
+      return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0 };
+    }
+  });
   const [expenses, setExpenses] = useState(() => {
-    const loaded = safeLoad('ss_expenses', []);
-    return Array.isArray(loaded) ? loaded.filter(e => e?.id && e?.amount && e?.date) : [];
+    try {
+      const stored = localStorage.getItem('ss_expenses');
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [];
+      return parsed;
+    } catch (err) {
+      console.warn('Failed to load expenses:', err);
+      return [];
+    }
   });
   const [lendings, setLendings] = useState(() => {
     try {
       const stored = localStorage.getItem('ss_lendings');
       if (!stored) return [];
       const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [];
       return parsed.map(l => ({
         ...l,
-        amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
+        amountOriginal: l.amountOriginal ?? parseFloat(l.amount) ?? 0,
         amountPaid: l.amountPaid ?? 0,
-        payments: l.payments ?? [],
+        payments: Array.isArray(l.payments) ? l.payments : [],
         status: l.status ?? 'pending'
       }));
     } catch (err) {
@@ -58,6 +76,7 @@ function SpendSenseApp() {
   const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
   const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
   const [chatHistory, setChatHistory] = useState(() => safeLoad('ss_chat', []));
+  const [animatingLendId, setAnimatingLendId] = useState(null);
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -165,7 +184,7 @@ function SpendSenseApp() {
       case 'expenses':
         return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses} openEditExpense={openEditExpense}/>;
       case 'lend':
-        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend}/>;
+        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend} animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
@@ -380,10 +399,16 @@ class ErrorBoundary extends React.Component {
           <h2 className="font-semibold text-lg text-gray-800 mb-2">Something went wrong</h2>
           <p className="text-sm text-gray-400 text-center mb-6">{this.state.error?.message || 'Unknown error'}</p>
           <button
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium active:scale-95 transition-transform"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium mb-3 w-full"
           >
-            Reset App &amp; Reload
+            Try Again
+          </button>
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            className="px-6 py-3 bg-red-50 text-red-500 rounded-2xl text-sm font-medium w-full"
+          >
+            Reset App and Reload
           </button>
         </div>
       );
@@ -392,30 +417,10 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const App = () => {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loading) return null;
-
-  return (
-    <ErrorBoundary>
-      {session ? <SpendSenseApp session={session} /> : <AuthPage />}
-    </ErrorBoundary>
-  );
-};
+const App = () => (
+  <ErrorBoundary>
+    <SpendSenseApp />
+  </ErrorBoundary>
+);
 
 export default App;
