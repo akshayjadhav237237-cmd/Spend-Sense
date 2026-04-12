@@ -365,20 +365,30 @@ const App = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+    }).catch(err => {
+      console.warn("Supabase auth error:", err);
+      // Fallback: gracefully stop loading even if Supabase is offline
+      setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+      });
+      return () => subscription.unsubscribe();
+    } catch(e) {
+      console.warn("Supabase listener error:", e);
+    }
   }, []);
 
   if (loading) return null;
 
+  // If Supabase keys are missing or placeholder, bypass login and allow local access
+  const isLocalMode = !import.meta.env.VITE_SUPABASE_URL || String(import.meta.env.VITE_SUPABASE_URL).includes('placeholder');
+
   return (
     <ErrorBoundary>
-      {session ? <SpendSenseApp session={session} /> : <AuthPage />}
+      {(session || isLocalMode) ? <SpendSenseApp session={session} /> : <AuthPage />}
     </ErrorBoundary>
   );
 };
