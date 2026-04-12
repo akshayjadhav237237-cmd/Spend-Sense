@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 import AuthPage from './components/AuthPage.jsx';
 import { OfflineBanner, Toast, BottomNav, BottomSheet } from './components/GlobalComponents.jsx';
@@ -205,25 +205,8 @@ function SpendSenseApp() {
         @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0) } 40% { transform: scale(1) } }
         @keyframes confettiFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1 } 100% { transform: translateY(60px) rotate(360deg); opacity: 0 } }
         
-        @keyframes slideOutRight {
-          0% { transform: translateX(0); opacity: 1; }
-          60% { transform: translateX(110%); opacity: 0.3; }
-          100% { transform: translateX(110%); opacity: 0; }
-        }
-
-        @keyframes slideInLeft {
-          0% { transform: translateX(-40px); opacity: 0; }
-          100% { transform: translateX(0); opacity: 1; }
-        }
-
-        .lending-slide-out {
-          animation: slideOutRight 0.6s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-          pointer-events: none;
-        }
-
-        .lending-slide-in {
-          animation: slideInLeft 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
+        @keyframes slideOutRight { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(110%); opacity: 0; } }
+        .lend-exit { animation: slideOutRight 0.55s cubic-bezier(0.55,0,1,0.45) forwards; pointer-events: none; overflow: hidden; }
 
         .animate-fade-in { animation: fadeIn 200ms ease-out both }
         .animate-slide-up { animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
