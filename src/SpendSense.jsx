@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './supabaseClient.js';
 import AuthPage from './components/AuthPage.jsx';
 import { OfflineBanner, Toast, BottomNav, BottomSheet } from './components/GlobalComponents.jsx';
@@ -9,7 +9,7 @@ import SummaryView from './views/SummaryView.jsx';
 import AiInsightsView from './views/AiInsightsView.jsx';
 import SettingsSheet from './views/SettingsSheet.jsx';
 import { getTodayISO, generateId, CATEGORIES } from './utils.js';
-import { Home, Receipt, Handshake, BarChart2, Sparkles, Plus, Settings, X, ChevronDown, ChevronLeft, ChevronRight, Camera, Download, Pencil, Trash2, Check, AlertCircle, CheckCircle, Info, WifiOff, TrendingUp, TrendingDown, Minus, Lightbulb, Copy, MessageSquare, ContactRound, Send } from 'lucide-react';
+import { Camera, X, Pencil } from 'lucide-react';
 
 const DEFAULT_SETTINGS = { name:'Student', currency:'₹', theme:'light', budgetLimit:0, weeklyDigest:false, haptics:true };
 
@@ -33,50 +33,23 @@ function nextDueDateCalc(freq, from) {
 
 function SpendSenseApp() {
   const [activeTab, setActiveTab] = useState('home');
-  const [settings, setSettings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('ss_settings');
-      if (!stored) return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0 };
-      const parsed = JSON.parse(stored);
-      return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0, ...parsed };
-    } catch (err) {
-      return { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0 };
-    }
-  });
+  const [settings, setSettings] = useState(() => safeLoad('ss_settings', DEFAULT_SETTINGS));
   const [expenses, setExpenses] = useState(() => {
-    try {
-      const stored = localStorage.getItem('ss_expenses');
-      if (!stored) return [];
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) return [];
-      return parsed;
-    } catch (err) {
-      console.warn('Failed to load expenses:', err);
-      return [];
-    }
+    const loaded = safeLoad('ss_expenses', []);
+    return Array.isArray(loaded) ? loaded.filter(e => e?.id && e?.amount && e?.date) : [];
   });
   const [lendings, setLendings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('ss_lendings');
-      if (!stored) return [];
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map(l => ({
-        ...l,
-        amountOriginal: l.amountOriginal ?? parseFloat(l.amount) ?? 0,
-        amountPaid: l.amountPaid ?? 0,
-        payments: Array.isArray(l.payments) ? l.payments : [],
-        status: l.status ?? 'pending'
-      }));
-    } catch (err) {
-      console.warn('Failed to load lendings:', err);
-      return [];
-    }
+    const loaded = safeLoad('ss_lendings', []);
+    return Array.isArray(loaded) ? loaded.filter(l => l?.id && l?.amount).map(l => ({
+      ...l,
+      amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
+      amountPaid: l.amountPaid ?? 0,
+      payments: l.payments ?? []
+    })) : [];
   });
   const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
   const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
   const [chatHistory, setChatHistory] = useState(() => safeLoad('ss_chat', []));
-  const [animatingLendId, setAnimatingLendId] = useState(null);
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -98,13 +71,7 @@ function SpendSenseApp() {
   // localStorage sync
   useEffect(() => { safeSave('ss_settings', settings, showToast); }, [settings]);
   useEffect(() => { safeSave('ss_expenses', expenses, showToast); }, [expenses]);
-  useEffect(() => {
-    try {
-      localStorage.setItem('ss_lendings', JSON.stringify(lendings));
-    } catch (err) {
-      console.warn('Failed to save lendings:', err);
-    }
-  }, [lendings]);
+  useEffect(() => { safeSave('ss_lendings', lendings, showToast); }, [lendings]);
   useEffect(() => { safeSave('ss_recurring', recurringExpenses, showToast); }, [recurringExpenses]);
   useEffect(() => { safeSave('ss_goals', savingsGoals, showToast); }, [savingsGoals]);
   useEffect(() => { safeSave('ss_chat', chatHistory, showToast); }, [chatHistory]);
@@ -184,7 +151,7 @@ function SpendSenseApp() {
       case 'expenses':
         return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses} openEditExpense={openEditExpense}/>;
       case 'lend':
-        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend} animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId}/>;
+        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
@@ -204,10 +171,6 @@ function SpendSenseApp() {
         @keyframes shake { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
         @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0) } 40% { transform: scale(1) } }
         @keyframes confettiFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1 } 100% { transform: translateY(60px) rotate(360deg); opacity: 0 } }
-        
-        @keyframes slideOutRight { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(110%); opacity: 0; } }
-        .lend-exit { animation: slideOutRight 0.55s cubic-bezier(0.55,0,1,0.45) forwards; pointer-events: none; overflow: hidden; }
-
         .animate-fade-in { animation: fadeIn 200ms ease-out both }
         .animate-slide-up { animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
         .animate-scale-in { animation: scaleIn 200ms ease-out both }
@@ -382,16 +345,10 @@ class ErrorBoundary extends React.Component {
           <h2 className="font-semibold text-lg text-gray-800 mb-2">Something went wrong</h2>
           <p className="text-sm text-gray-400 text-center mb-6">{this.state.error?.message || 'Unknown error'}</p>
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
-            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium mb-3 w-full"
-          >
-            Try Again
-          </button>
-          <button
             onClick={() => { localStorage.clear(); window.location.reload(); }}
-            className="px-6 py-3 bg-red-50 text-red-500 rounded-2xl text-sm font-medium w-full"
+            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium active:scale-95 transition-transform"
           >
-            Reset App and Reload
+            Reset App &amp; Reload
           </button>
         </div>
       );
@@ -400,10 +357,30 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const App = () => (
-  <ErrorBoundary>
-    <SpendSenseApp />
-  </ErrorBoundary>
-);
+const App = () => {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) return null;
+
+  return (
+    <ErrorBoundary>
+      {session ? <SpendSenseApp session={session} /> : <AuthPage />}
+    </ErrorBoundary>
+  );
+};
 
 export default App;

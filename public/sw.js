@@ -1,6 +1,5 @@
-// SpendSense Service Worker — v3 (network-first navigation)
-// Bump this version on every deploy to bust old caches immediately
-const CACHE_VERSION = 'spendsense-v3';
+// SpendSense Service Worker — v4 (force-bust stale v3 cache)
+const CACHE_VERSION = 'spendsense-v4';
 
 // Only cache truly static assets (manifest, icons) — NOT index.html or JS/CSS bundles
 // because those have hashed filenames managed by Vite and must always come from network
