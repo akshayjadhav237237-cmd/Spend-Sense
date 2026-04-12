@@ -143,6 +143,7 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
   const [showAdd,setShowAdd]=useState(false);
   const [deleteId,setDeleteId]=useState(null);
   const [expandedPayments, setExpandedPayments] = useState({});
+  const [animatingLendId, setAnimatingLendId] = useState(null);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState(null);
@@ -180,9 +181,28 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
     setShowPaymentModal(false);
     setPaymentTarget(null);
     setPaymentForm({ amount: '', date: getTodayISO(), note: '' });
+    
     if (newStatus === 'returned') {
-      showToast('Fully returned! 🎉', 'success');
+      setAnimatingLendId(paymentTarget.id);
+      setTimeout(() => {
+        setLendings(prev => prev.map(l => l.id === paymentTarget.id ? {
+          ...l,
+          amountPaid: newAmountPaid,
+          amount: newRemaining,
+          status: 'returned',
+          payments: [...(l.payments || []), newPayment]
+        } : l));
+        setAnimatingLendId(null);
+        showToast('Fully returned! 🎉', 'success');
+      }, 650);
     } else {
+      setLendings(prev => prev.map(l => l.id === paymentTarget.id ? {
+        ...l,
+        amountPaid: newAmountPaid,
+        amount: newRemaining,
+        status: newStatus,
+        payments: [...(l.payments || []), newPayment]
+      } : l));
       showToast(`Payment recorded — ${sym}${newRemaining.toFixed(2)} remaining`, 'info');
     }
   };
@@ -269,7 +289,10 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
         const daysSince = Math.floor((Date.now() - new Date(lend.date+'T00:00:00')) / 86400000);
         const expanded = expandedPayments[lend.id] || false;
         return (
-          <div key={lend.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card relative">
+          <div
+            key={lend.id}
+            className={`bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card ${animatingLendId === lend.id ? 'lending-slide-out' : 'lending-slide-in'}`}
+          >
             <div className="absolute top-2 right-2 flex gap-1">
               <button onClick={() => openEditLend?.(lend)} aria-label="Edit lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-400 active:scale-95 transition-transform"><Pencil size={13}/></button>
               <button onClick={() => setDeleteId(lend.id)} aria-label="Delete lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 active:scale-95 transition-transform"><Trash2 size={14}/></button>
@@ -327,7 +350,19 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
                   Remind
                 </button>
                 <button
-                  onClick={() => setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'returned', amountPaid: original, amount: 0 } : l))}
+                  onClick={() => {
+                    setAnimatingLendId(lend.id);
+                    setTimeout(() => {
+                      setLendings(prev => prev.map(l => l.id === lend.id ? {
+                        ...l,
+                        status: 'returned',
+                        amountPaid: lend.amountOriginal,
+                        amount: 0
+                      } : l));
+                      setAnimatingLendId(null);
+                      showToast('Marked as fully returned! 🎉', 'success');
+                    }, 650);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-gray-50 text-gray-400 text-[10px] font-medium active:scale-95 transition-transform border border-gray-100"
                 >
                   Full ✓

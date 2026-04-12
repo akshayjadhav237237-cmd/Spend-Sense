@@ -39,13 +39,21 @@ function SpendSenseApp() {
     return Array.isArray(loaded) ? loaded.filter(e => e?.id && e?.amount && e?.date) : [];
   });
   const [lendings, setLendings] = useState(() => {
-    const loaded = safeLoad('ss_lendings', []);
-    return Array.isArray(loaded) ? loaded.filter(l => l?.id && l?.amount).map(l => ({
-      ...l,
-      amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
-      amountPaid: l.amountPaid ?? 0,
-      payments: l.payments ?? []
-    })) : [];
+    try {
+      const stored = localStorage.getItem('ss_lendings');
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return parsed.map(l => ({
+        ...l,
+        amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
+        amountPaid: l.amountPaid ?? 0,
+        payments: l.payments ?? [],
+        status: l.status ?? 'pending'
+      }));
+    } catch (err) {
+      console.warn('Failed to load lendings:', err);
+      return [];
+    }
   });
   const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
   const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
@@ -71,7 +79,13 @@ function SpendSenseApp() {
   // localStorage sync
   useEffect(() => { safeSave('ss_settings', settings, showToast); }, [settings]);
   useEffect(() => { safeSave('ss_expenses', expenses, showToast); }, [expenses]);
-  useEffect(() => { safeSave('ss_lendings', lendings, showToast); }, [lendings]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('ss_lendings', JSON.stringify(lendings));
+    } catch (err) {
+      console.warn('Failed to save lendings:', err);
+    }
+  }, [lendings]);
   useEffect(() => { safeSave('ss_recurring', recurringExpenses, showToast); }, [recurringExpenses]);
   useEffect(() => { safeSave('ss_goals', savingsGoals, showToast); }, [savingsGoals]);
   useEffect(() => { safeSave('ss_chat', chatHistory, showToast); }, [chatHistory]);
@@ -171,6 +185,27 @@ function SpendSenseApp() {
         @keyframes shake { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
         @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0) } 40% { transform: scale(1) } }
         @keyframes confettiFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1 } 100% { transform: translateY(60px) rotate(360deg); opacity: 0 } }
+        
+        @keyframes slideOutRight {
+          0% { transform: translateX(0); opacity: 1; }
+          60% { transform: translateX(110%); opacity: 0.3; }
+          100% { transform: translateX(110%); opacity: 0; }
+        }
+
+        @keyframes slideInLeft {
+          0% { transform: translateX(-40px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+
+        .lending-slide-out {
+          animation: slideOutRight 0.6s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+          pointer-events: none;
+        }
+
+        .lending-slide-in {
+          animation: slideInLeft 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
         .animate-fade-in { animation: fadeIn 200ms ease-out both }
         .animate-slide-up { animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
         .animate-scale-in { animation: scaleIn 200ms ease-out both }
