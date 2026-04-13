@@ -393,12 +393,13 @@ export default function LendView({
                           </button>
                           <button
                             onClick={() => {
-                              setAnimatingLendId(lend.id);
-                              setTimeout(() => {
-                                setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'returned', amountPaid: original, amount: 0 } : l));
-                                setAnimatingLendId(null);
-                                showToast('Marked as returned! 🎉', 'success');
-                              }, 650);
+                              setLendings(prev => prev.map(l => l.id === lend.id ? {
+                                ...l,
+                                status: 'returned',
+                                amountPaid: l.amountOriginal || parseFloat(l.amount),
+                                amount: 0
+                              } : l));
+                              showToast('Marked as fully returned! 🎉', 'success');
                             }}
                             className="flex-1 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium active:scale-95 transition-transform border border-green-100"
                           >
