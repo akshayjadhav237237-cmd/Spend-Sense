@@ -53,6 +53,11 @@ function SpendSenseApp() {
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Grouped lending state
+  const [expandedPersons, setExpandedPersons] = useState({});
+  const [animatingLendId, setAnimatingLendId] = useState(null);
+  const [expandedPayments, setExpandedPayments] = useState({});
+
   // Edit Expense
   const [showEditExpenseModal, setShowEditExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -151,7 +156,7 @@ function SpendSenseApp() {
       case 'expenses':
         return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses} openEditExpense={openEditExpense}/>;
       case 'lend':
-        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend}/>;
+        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend} expandedPersons={expandedPersons} setExpandedPersons={setExpandedPersons} animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId} expandedPayments={expandedPayments} setExpandedPayments={setExpandedPayments}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
@@ -171,6 +176,15 @@ function SpendSenseApp() {
         @keyframes shake { 0%, 100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
         @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0) } 40% { transform: scale(1) } }
         @keyframes confettiFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1 } 100% { transform: translateY(60px) rotate(360deg); opacity: 0 } }
+        @keyframes slideOutRight {
+          0% { transform: translateX(0); opacity: 1; max-height: 300px; }
+          100% { transform: translateX(110%); opacity: 0; max-height: 0; padding: 0; margin: 0; }
+        }
+        .lend-exit {
+          animation: slideOutRight 0.6s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+          pointer-events: none;
+          overflow: hidden;
+        }
         .animate-fade-in { animation: fadeIn 200ms ease-out both }
         .animate-slide-up { animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
         .animate-scale-in { animation: scaleIn 200ms ease-out both }

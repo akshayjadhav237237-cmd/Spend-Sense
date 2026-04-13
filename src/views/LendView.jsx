@@ -1,7 +1,42 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, Trash2, Pencil, MessageSquare, Copy } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil } from 'lucide-react';
 import { formatCurr, getRelativeDateLabel, getTodayISO, parseAmount, generateId, avatarColor, getInitials } from '../utils.js';
 import { BottomSheet, ConfirmDialog, useContactPicker } from '../components/GlobalComponents.jsx';
+
+// Step 2 — Grouping utility
+const groupLendingsByPerson = (lendings) => {
+  const map = {};
+  lendings.forEach(l => {
+    const key = l.name.trim().toLowerCase();
+    if (!map[key]) {
+      map[key] = {
+        personName: l.name.trim(),
+        phone: l.phone || '',
+        lendings: [],
+        totalOriginal: 0,
+        totalPaid: 0,
+        totalRemaining: 0,
+        hasAnyPending: false,
+        hasAnyPartial: false,
+        allReturned: false,
+      };
+    }
+    const original = l.amountOriginal || parseFloat(l.amount) || 0;
+    const paid = l.amountPaid || 0;
+    const remaining = original - paid;
+    map[key].lendings.push(l);
+    map[key].totalOriginal += original;
+    map[key].totalPaid += paid;
+    map[key].totalRemaining += remaining;
+    if (l.status === 'pending') map[key].hasAnyPending = true;
+    if (l.status === 'partial') map[key].hasAnyPartial = true;
+  });
+  Object.values(map).forEach(g => {
+    g.allReturned = g.lendings.every(l => l.status === 'returned');
+    g.overallStatus = g.allReturned ? 'returned' : g.hasAnyPartial || g.totalPaid > 0 ? 'partial' : 'pending';
+  });
+  return Object.values(map);
+};
 
 function AddLendModal({ isOpen, onClose, onAdd, settings, lendings, showToast }) {
   const sym = settings.currency;
@@ -105,44 +140,16 @@ function AddLendModal({ isOpen, onClose, onAdd, settings, lendings, showToast })
   );
 }
 
-function PartialReturnModal({ isOpen, lend, onClose, onConfirm, sym }) {
-  const [amt,setAmt]=useState('');
-  const [date,setDate]=useState(getTodayISO());
-  if(!lend) return null;
-  const submit=()=>{
-    const v=parseAmount(amt);
-    if(!v||v>lend.amount) return;
-    onConfirm(lend.id,v,date); setAmt(''); onClose();
-  };
-  return (
-    <BottomSheet isOpen={isOpen} onClose={onClose} title="Mark as Returned">
-      <div className="space-y-4">
-        <p className="text-sm text-gray-500">Total lent: <strong>{formatCurr(lend.amount,sym)}</strong></p>
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="ret-amt">Amount Returned</label>
-          <div className="flex items-center border border-gray-200 rounded-xl px-3 gap-2 bg-gray-50">
-            <span className="text-gray-400 text-sm">{sym}</span>
-            <input id="ret-amt" type="number" inputMode="decimal" value={amt} onChange={e=>setAmt(e.target.value)} placeholder={String(lend.amount)} autoFocus
-              className="flex-1 py-3 bg-transparent outline-none text-sm text-gray-800 focus-visible:ring-0"/>
-          </div>
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block" htmlFor="ret-date">Return Date</label>
-          <input id="ret-date" type="date" value={date} max={getTodayISO()} onChange={e=>setDate(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-3 bg-gray-50 text-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"/>
-        </div>
-        <button onClick={submit} className="w-full py-3.5 bg-[#51CF66] text-white rounded-2xl font-semibold text-sm active:scale-95 transition-transform">Confirm Return</button>
-      </div>
-    </BottomSheet>
-  );
-}
-
-export default function LendView({ settings, lendings, setLendings, showToast, openEditLend }) {
+export default function LendView({
+  settings, lendings, setLendings, showToast, openEditLend,
+  expandedPersons, setExpandedPersons,
+  animatingLendId, setAnimatingLendId,
+  expandedPayments, setExpandedPayments
+}) {
   const sym = settings.currency;
   const [lendFilter,setLendFilter]=useState('pending');
   const [showAdd,setShowAdd]=useState(false);
   const [deleteId,setDeleteId]=useState(null);
-  const [expandedPayments, setExpandedPayments] = useState({});
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState(null);
@@ -152,11 +159,13 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
   const returnedCount=useMemo(()=>lendings.filter(l=>l.status==='returned').length,[lendings]);
   const pendingTotal=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(parseFloat(l.amount)||0),0),[lendings]);
 
-  const filtered=useMemo(()=>{
-    if(lendFilter==='pending') return lendings.filter(l=>l.status==='pending'||l.status==='partial');
-    if(lendFilter==='returned') return lendings.filter(l=>l.status==='returned');
-    return [...lendings].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  },[lendings,lendFilter]);
+  // Step 4 — Grouped data
+  const groupedLendings = useMemo(() => {
+    const filtered = lendFilter === 'all' ? lendings
+      : lendFilter === 'pending' ? lendings.filter(l => l.status === 'pending' || l.status === 'partial')
+      : lendings.filter(l => l.status === 'returned');
+    return groupLendingsByPerson(filtered);
+  }, [lendings, lendFilter]);
 
   const addLend=useCallback((l)=>{setLendings(p=>[l,...p]);showToast('Lending added!','success');},[setLendings,showToast]);
   const deleteLend=useCallback((id)=>{setLendings(p=>p.filter(l=>l.id!==id));showToast('Deleted','info');setDeleteId(null);},[setLendings,showToast]);
@@ -255,113 +264,182 @@ export default function LendView({ settings, lendings, setLendings, showToast, o
         ))}
       </div>
 
-      {filtered.length===0?(
-        <div className="flex flex-col items-center py-14">
-          <span className="text-5xl mb-3">🤝</span>
-          <p className="font-medium text-gray-700">No {lendFilter==='all'?'':lendFilter+' '}lendings</p>
-          <p className="text-xs text-gray-400 mt-1">Keep track of who owes you money</p>
+      {/* Step 4 — Grouped lending cards */}
+      {groupedLendings.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <p className="text-5xl mb-4">🤝</p>
+          <p className="font-semibold text-gray-600 ss-text">No lendings here</p>
+          <p className="text-sm text-gray-400 ss-text-muted mt-1">Tap + to track money you lent</p>
         </div>
-      ):filtered.map(lend => {
-        const original = lend.amountOriginal || parseFloat(lend.amount);
-        const paid = lend.amountPaid || 0;
-        const remaining = original - paid;
-        const progressPct = original > 0 ? (paid / original) * 100 : 0;
-        const daysSince = Math.floor((Date.now() - new Date(lend.date+'T00:00:00')) / 86400000);
-        const expanded = expandedPayments[lend.id] || false;
-        return (
-          <div key={lend.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card relative">
-            <div className="absolute top-2 right-2 flex gap-1">
-              <button onClick={() => openEditLend?.(lend)} aria-label="Edit lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-400 active:scale-95 transition-transform"><Pencil size={13}/></button>
-              <button onClick={() => setDeleteId(lend.id)} aria-label="Delete lending" className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 active:scale-95 transition-transform"><Trash2 size={14}/></button>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 font-semibold text-sm flex-shrink-0" style={{background:avatarColor(lend.name)}}>
-                {getInitials(lend.name)}
-              </div>
-              <div className="flex-1 min-w-0 pr-8">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-sm text-gray-800 truncate ss-text">{lend.name}</p>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    lend.status === 'returned' ? 'bg-green-100 text-green-700' :
-                    lend.status === 'partial'  ? 'bg-blue-100 text-blue-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {lend.status === 'returned' ? 'Returned' : lend.status === 'partial' ? 'Partial' : 'Pending'}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 ss-text-muted mt-0.5">{lend.reason}</p>
-                <p className="text-xs text-gray-400 ss-text-muted">{getRelativeDateLabel(lend.date)}</p>
-              </div>
-            </div>
+      )}
 
-            <div className="mt-3">
-              <div className="flex items-baseline justify-between mb-1">
-                <span className="text-lg font-bold text-[#4ECDC4]">{formatCurr(remaining, sym)}</span>
-                <span className="text-xs text-gray-400 ss-text-muted">of {formatCurr(original, sym)}</span>
+      {groupedLendings.map(group => {
+        const isExpanded = expandedPersons[group.personName] || false;
+        const progressPct = group.totalOriginal > 0 ? (group.totalPaid / group.totalOriginal) * 100 : 0;
+
+        return (
+          <div key={group.personName} className="mb-3">
+            {/* GROUP HEADER CARD */}
+            <div
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 ss-card cursor-pointer active:scale-[0.99] transition-transform"
+              onClick={() => setExpandedPersons(prev => ({ ...prev, [group.personName]: !prev[group.personName] }))}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 font-bold text-base flex-shrink-0 ss-avatar-bg"
+                  style={{background: avatarColor(group.personName), color: '#fff'}}>
+                  {getInitials(group.personName)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-bold text-sm text-gray-800 ss-text">{group.personName}</p>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      group.overallStatus === 'returned' ? 'bg-green-100 text-green-700' :
+                      group.overallStatus === 'partial' ? 'bg-blue-100 text-blue-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {group.overallStatus === 'returned' ? 'All Returned' : group.overallStatus === 'partial' ? 'Partial' : 'Pending'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 ss-text-muted mt-0.5">{group.lendings.length} lending{group.lendings.length > 1 ? 's' : ''}</p>
+                </div>
+                <ChevronDown
+                  size={18}
+                  className={`text-gray-400 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                />
               </div>
-              {paid > 0 && (
-                <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+
+              <div className="mt-3 flex items-baseline justify-between">
+                <span className="text-xl font-bold text-[#4ECDC4]">{formatCurr(group.totalRemaining, sym)}</span>
+                <span className="text-xs text-gray-400 ss-text-muted">of {formatCurr(group.totalOriginal, sym)}</span>
+              </div>
+
+              {group.totalPaid > 0 && (
+                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
                   <div className="bg-[#4ECDC4] h-1.5 rounded-full transition-all duration-700" style={{ width: progressPct + '%' }} />
                 </div>
               )}
-              {lend.status !== 'returned' && daysSince > 30 && (
-                <p className="text-[10px] bg-red-50 text-red-600 font-medium px-2 py-0.5 rounded inline-block mb-2">⚠️ {daysSince}d overdue</p>
-              )}
-              {lend.status !== 'returned' && daysSince >= 7 && daysSince <= 30 && (
-                <p className="text-[10px] bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded inline-block mb-2">{daysSince}d ago</p>
+
+              {!group.allReturned && (
+                <div className="flex gap-2 mt-3" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => remindLending({ ...group.lendings[0], name: group.personName, phone: group.phone, amountOriginal: group.totalOriginal, amountPaid: group.totalPaid, amount: group.totalRemaining })}
+                    className="flex-1 py-2 rounded-xl bg-green-50 text-green-600 text-sm font-medium active:scale-95 transition-transform border border-green-100"
+                  >
+                    Remind
+                  </button>
+                </div>
               )}
             </div>
 
-            {lend.status !== 'returned' && (
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => { setPaymentTarget(lend); setPaymentForm({ amount: remaining.toFixed(2), date: getTodayISO(), note: '' }); setShowPaymentModal(true); }}
-                  className="flex-1 py-1.5 rounded-xl bg-teal-50 text-teal-600 text-xs font-medium active:scale-95 transition-transform border border-teal-100 focus-visible:ring-2 focus-visible:ring-teal-400"
-                >
-                  + Payment
-                </button>
-                <button
-                  onClick={() => remindLending(lend)}
-                  className="flex-1 py-1.5 rounded-xl bg-green-50 text-green-600 text-xs font-medium active:scale-95 transition-transform border border-green-100 focus-visible:ring-2 focus-visible:ring-green-400"
-                >
-                  Remind
-                </button>
-                <button
-                  onClick={() => setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'returned', amountPaid: original, amount: 0 } : l))}
-                  className="px-3 py-1.5 rounded-xl bg-gray-50 text-gray-400 text-[10px] font-medium active:scale-95 transition-transform border border-gray-100"
-                >
-                  Full ✓
-                </button>
-              </div>
-            )}
-            {lend.status === 'returned' && (
-              <button
-                onClick={() => setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'pending', amountPaid: 0, amount: original, payments: [] } : l))}
-                className="w-full mt-3 py-1.5 rounded-xl bg-gray-50 text-gray-400 text-xs font-medium active:scale-95 transition-transform border border-gray-100"
-              >
-                Undo Return
-              </button>
-            )}
+            {/* EXPANDED INDIVIDUAL LENDINGS */}
+            {isExpanded && (
+              <div className="ml-4 mt-1 space-y-2">
+                {group.lendings.map(lend => {
+                  const original = lend.amountOriginal || parseFloat(lend.amount) || 0;
+                  const paid = lend.amountPaid || 0;
+                  const remaining = original - paid;
+                  const lendProgress = original > 0 ? (paid / original) * 100 : 0;
+                  const daysSince = Math.floor((Date.now() - new Date(lend.date)) / 86400000);
+                  const isAnimating = animatingLendId === lend.id;
+                  const isExpandedPayments = expandedPayments[lend.id] || false;
 
-            {lend.payments && lend.payments.length > 0 && (
-              <div className="mt-3 border-t border-gray-50 pt-3 ss-divider">
-                <button
-                  onClick={() => setExpandedPayments(prev => ({ ...prev, [lend.id]: !prev[lend.id] }))}
-                  className="flex items-center justify-between w-full text-xs text-gray-400 ss-text-muted"
-                >
-                  <span>{lend.payments.length} payment{lend.payments.length > 1 ? 's' : ''} recorded</span>
-                  <ChevronDown size={14} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-                </button>
-                {expanded && (
-                  <div className="mt-2 space-y-1.5">
-                    {lend.payments.map(p => (
-                      <div key={p.id} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-400 ss-text-muted">{getRelativeDateLabel(p.date)}{p.note ? ` · ${p.note}` : ''}</span>
-                        <span className="text-teal-500 font-medium">+{formatCurr(p.amount, sym)}</span>
+                  return (
+                    <div
+                      key={lend.id}
+                      className={`bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 ss-card ${isAnimating ? 'lend-exit' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              lend.status === 'returned' ? 'bg-green-100 text-green-700' :
+                              lend.status === 'partial' ? 'bg-blue-100 text-blue-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {lend.status === 'returned' ? 'Returned' : lend.status === 'partial' ? 'Partial' : 'Pending'}
+                            </span>
+                            {lend.status !== 'returned' && daysSince > 30 && (
+                              <span className="text-xs text-red-500 font-medium">⚠️ {daysSince}d overdue</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 ss-text-muted mt-1">{lend.reason || 'No reason given'}</p>
+                          <p className="text-xs text-gray-400 ss-text-muted">{getRelativeDateLabel(lend.date)}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-bold text-sm text-[#4ECDC4]">{formatCurr(remaining, sym)}</p>
+                          {paid > 0 && <p className="text-xs text-gray-400 ss-text-muted">of {formatCurr(original, sym)}</p>}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      {paid > 0 && (
+                        <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
+                          <div className="bg-[#4ECDC4] h-1 rounded-full transition-all duration-700" style={{ width: lendProgress + '%' }} />
+                        </div>
+                      )}
+
+                      {lend.status !== 'returned' && (
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => { setPaymentTarget(lend); setPaymentForm({ amount: remaining.toFixed(2), date: getTodayISO(), note: '' }); setShowPaymentModal(true); }}
+                            className="flex-1 py-2 rounded-lg bg-teal-50 text-teal-600 text-xs font-medium active:scale-95 transition-transform border border-teal-100"
+                          >
+                            + Payment
+                          </button>
+                          <button
+                            onClick={() => openEditLend(lend)}
+                            className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center active:scale-95 transition-transform"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setAnimatingLendId(lend.id);
+                              setTimeout(() => {
+                                setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'returned', amountPaid: original, amount: 0 } : l));
+                                setAnimatingLendId(null);
+                                showToast('Marked as returned! 🎉', 'success');
+                              }, 650);
+                            }}
+                            className="flex-1 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium active:scale-95 transition-transform border border-green-100"
+                          >
+                            Full ✓
+                          </button>
+                        </div>
+                      )}
+
+                      {lend.status === 'returned' && (
+                        <button
+                          onClick={() => setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'pending', amountPaid: 0, amount: original, payments: [] } : l))}
+                          className="w-full mt-2 py-2 rounded-lg bg-gray-50 text-gray-400 text-xs font-medium active:scale-95 transition-transform border border-gray-100"
+                        >
+                          Undo
+                        </button>
+                      )}
+
+                      {lend.payments && lend.payments.length > 0 && (
+                        <div className="mt-2 border-t border-gray-50 pt-2 ss-divider">
+                          <button
+                            onClick={() => setExpandedPayments(prev => ({ ...prev, [lend.id]: !prev[lend.id] }))}
+                            className="flex items-center justify-between w-full text-xs text-gray-400 ss-text-muted"
+                          >
+                            <span>{lend.payments.length} payment{lend.payments.length > 1 ? 's' : ''}</span>
+                            <ChevronDown size={12} className={`transition-transform duration-200 ${isExpandedPayments ? 'rotate-180' : ''}`} />
+                          </button>
+                          {isExpandedPayments && (
+                            <div className="mt-1.5 space-y-1">
+                              {lend.payments.map(p => (
+                                <div key={p.id} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-400 ss-text-muted">{getRelativeDateLabel(p.date)}{p.note ? ` · ${p.note}` : ''}</span>
+                                  <span className="text-teal-500 font-medium">+{formatCurr(p.amount, sym)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
