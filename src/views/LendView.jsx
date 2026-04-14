@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronDown, Trash2, Pencil } from 'lucide-react';
 import { formatCurr, getRelativeDateLabel, getTodayISO, parseAmount, generateId, avatarColor, getInitials } from '../utils.js';
 import { BottomSheet, ConfirmDialog, useContactPicker } from '../components/GlobalComponents.jsx';
+import { supabase } from '../supabaseClient.js';
 
 // Step 2 — Grouping utility
 const groupLendingsByPerson = (lendings) => {
@@ -144,7 +145,8 @@ export default function LendView({
   settings, lendings, setLendings, showToast, openEditLend,
   expandedPersons, setExpandedPersons,
   animatingLendId, setAnimatingLendId,
-  expandedPayments, setExpandedPayments
+  expandedPayments, setExpandedPayments,
+  lendingsLoading, updateLendingInDB
 }) {
   const sym = settings.currency;
   const [lendFilter,setLendFilter]=useState('pending');
@@ -174,36 +176,72 @@ export default function LendView({
     return groupLendingsByPerson(filteredLendings);
   }, [filteredLendings]);
 
-  const addLend=useCallback((l)=>{setLendings(p=>[l,...p]);showToast('Lending added!','success');},[setLendings,showToast]);
-  const deleteLend=useCallback((id)=>{setLendings(p=>p.filter(l=>l.id!==id));showToast('Deleted','info');setDeleteId(null);},[setLendings,showToast]);
+  const addLend = useCallback(async (l) => {
+    try {
+      const dbRecord = {
+        id: l.id,
+        name: l.name,
+        phone: l.phone || '',
+        amount: l.amount,
+        amount_original: l.amountOriginal,
+        amount_paid: 0,
+        payments: [],
+        reason: l.reason,
+        date: l.date,
+        status: 'pending'
+      };
+      const { error } = await supabase.from('lendings').insert([dbRecord]);
+      if (error) throw error;
+      setLendings(p => [l, ...p]);
+      showToast('Lending added!', 'success');
+    } catch (err) {
+      console.error('Add lending error:', err);
+      showToast('Failed to add lending', 'error');
+    }
+  }, [setLendings, showToast]);
 
-  const handleRecordPayment = () => {
-    const amt = parseFloat(paymentForm.amount);
-    if (!amt || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
-    const remaining = paymentTarget.amountOriginal - paymentTarget.amountPaid;
-    if (amt > remaining) { showToast('Amount exceeds remaining balance', 'error'); return; }
-    const newPayment = { id: generateId(), amount: amt, date: paymentForm.date, note: paymentForm.note.trim() };
-    const newAmountPaid = paymentTarget.amountPaid + amt;
-    const newRemaining = paymentTarget.amountOriginal - newAmountPaid;
-    const newStatus = newRemaining <= 0 ? 'returned' : 'partial';
-    setLendings(prev => {
-      const updated = prev.map(l => l.id === paymentTarget.id ? {
-        ...l,
-        amountPaid: newAmountPaid,
-        amount: newRemaining,
-        status: newStatus,
-        payments: [...(l.payments || []), newPayment]
-      } : l);
-      console.log('UPDATED LENDINGS AFTER PAYMENT:', updated);
-      return updated;
-    });
-    setShowPaymentModal(false);
-    setPaymentTarget(null);
-    setPaymentForm({ amount: '', date: getTodayISO(), note: '' });
-    if (newStatus === 'returned') {
-      showToast('Fully returned! 🎉', 'success');
-    } else {
-      showToast(`Payment recorded — ${sym}${newRemaining.toFixed(2)} remaining`, 'info');
+  const deleteLend = useCallback(async (id) => {
+    try {
+      setLendings(p => p.filter(l => l.id !== id));
+      const { error } = await supabase.from('lendings').delete().eq('id', id);
+      if (error) throw error;
+      showToast('Deleted', 'info');
+    } catch (err) {
+      console.error('Delete lending error:', err);
+      showToast('Delete failed', 'error');
+    }
+    setDeleteId(null);
+  }, [setLendings, showToast]);
+
+  const handleRecordPayment = async () => {
+    try {
+      const amt = parseFloat(paymentForm.amount);
+      if (!amt || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
+      const remaining = paymentTarget.amountOriginal - paymentTarget.amountPaid;
+      if (amt > remaining) { showToast('Amount exceeds remaining balance', 'error'); return; }
+      const newPayment = { id: generateId(), amount: amt, date: paymentForm.date, note: paymentForm.note.trim() };
+      const newAmountPaid = paymentTarget.amountPaid + amt;
+      const newRemaining = paymentTarget.amountOriginal - newAmountPaid;
+      const newStatus = newRemaining <= 0 ? 'returned' : 'partial';
+      const newPayments = [...(paymentTarget.payments || []), newPayment];
+      const updates = { amountPaid: newAmountPaid, amount: newRemaining, status: newStatus, payments: newPayments };
+      setLendings(prev => {
+        const updated = prev.map(l => l.id === paymentTarget.id ? { ...l, ...updates } : l);
+        console.log('UPDATED LENDINGS AFTER PAYMENT:', updated);
+        return updated;
+      });
+      await updateLendingInDB(paymentTarget.id, updates);
+      setShowPaymentModal(false);
+      setPaymentTarget(null);
+      setPaymentForm({ amount: '', date: getTodayISO(), note: '' });
+      if (newStatus === 'returned') {
+        showToast('Fully returned! 🎉', 'success');
+      } else {
+        showToast(`Payment recorded — ${sym}${newRemaining.toFixed(2)} remaining`, 'info');
+      }
+    } catch (err) {
+      console.error('Record payment error:', err);
+      showToast('Something went wrong', 'error');
     }
   };
 
@@ -291,16 +329,20 @@ export default function LendView({
         </button>
       </div>
 
-      {/* Step 4 — Grouped lending cards */}
-      {groupedLendings.length === 0 && (
+      {/* Loading spinner while fetching from Supabase */}
+      {lendingsLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 rounded-full border-2 border-[#4ECDC4] border-t-transparent animate-spin" />
+        </div>
+      ) : groupedLendings.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
           <p className="text-5xl mb-4">🤝</p>
           <p className="font-semibold text-gray-600 ss-text">No lendings here</p>
           <p className="text-sm text-gray-400 ss-text-muted mt-1">Tap + to track money you lent</p>
         </div>
-      )}
+      ) : null}
 
-      {groupedLendings.map(group => {
+      {!lendingsLoading && groupedLendings.map(group => {
         const isExpanded = expandedPersons[group.personName] || false;
         const progressPct = group.totalOriginal > 0 ? (group.totalPaid / group.totalOriginal) * 100 : 0;
 
@@ -419,17 +461,18 @@ export default function LendView({
                             <Pencil size={13} />
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
+                              const updates = {
+                                status: 'returned',
+                                amountPaid: lend.amountOriginal || parseFloat(lend.amount),
+                                amount: 0
+                              };
                               setLendings(prev => {
-                                const updated = prev.map(l => l.id === lend.id ? {
-                                  ...l,
-                                  status: 'returned',
-                                  amountPaid: l.amountOriginal || parseFloat(l.amount),
-                                  amount: 0
-                                } : l);
+                                const updated = prev.map(l => l.id === lend.id ? { ...l, ...updates } : l);
                                 console.log('UPDATED LENDINGS AFTER RETURN:', updated);
                                 return updated;
                               });
+                              await updateLendingInDB(lend.id, updates);
                               showToast('Marked as fully returned! 🎉', 'success');
                             }}
                             className="flex-1 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium active:scale-95 transition-transform border border-green-100"
@@ -441,14 +484,15 @@ export default function LendView({
 
                       {lend.status === 'returned' && (
                         <button
-                          onClick={() => {
-                            setLendings(prev => prev.map(l => l.id === lend.id ? {
-                              ...l,
+                          onClick={async () => {
+                            const updates = {
                               status: 'pending',
                               amountPaid: 0,
-                              amount: l.amountOriginal || parseFloat(l.amount),
+                              amount: lend.amountOriginal || parseFloat(lend.amount),
                               payments: []
-                            } : l));
+                            };
+                            setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, ...updates } : l));
+                            await updateLendingInDB(lend.id, updates);
                             showToast('Moved back to pending', 'info');
                           }}
                           className="w-full mt-2 py-2 rounded-lg bg-gray-50 text-gray-400 text-xs font-medium active:scale-95 transition-transform border border-gray-100"

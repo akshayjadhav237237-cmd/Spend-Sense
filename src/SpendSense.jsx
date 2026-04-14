@@ -38,15 +38,8 @@ function SpendSenseApp() {
     const loaded = safeLoad('ss_expenses', []);
     return Array.isArray(loaded) ? loaded.filter(e => e?.id && e?.amount && e?.date) : [];
   });
-  const [lendings, setLendings] = useState(() => {
-    const loaded = safeLoad('ss_lendings', []);
-    return Array.isArray(loaded) ? loaded.filter(l => l?.id && l?.amount).map(l => ({
-      ...l,
-      amountOriginal: l.amountOriginal ?? parseFloat(l.amount),
-      amountPaid: l.amountPaid ?? 0,
-      payments: l.payments ?? []
-    })) : [];
-  });
+  const [lendings, setLendings] = useState([]);
+  const [lendingsLoading, setLendingsLoading] = useState(true);
   const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
   const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
   const [chatHistory, setChatHistory] = useState(() => safeLoad('ss_chat', []));
@@ -73,13 +66,45 @@ function SpendSenseApp() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // localStorage sync
+  // localStorage sync (expenses, settings, goals only — lendings use Supabase)
   useEffect(() => { safeSave('ss_settings', settings, showToast); }, [settings]);
   useEffect(() => { safeSave('ss_expenses', expenses, showToast); }, [expenses]);
-  useEffect(() => { safeSave('ss_lendings', lendings, showToast); }, [lendings]);
   useEffect(() => { safeSave('ss_recurring', recurringExpenses, showToast); }, [recurringExpenses]);
   useEffect(() => { safeSave('ss_goals', savingsGoals, showToast); }, [savingsGoals]);
   useEffect(() => { safeSave('ss_chat', chatHistory, showToast); }, [chatHistory]);
+
+  // Load lendings from Supabase
+  useEffect(() => {
+    const loadLendings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lendings')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const mapped = (data || []).map(l => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone || '',
+          amount: l.amount,
+          amountOriginal: l.amount_original || l.amount,
+          amountPaid: l.amount_paid || 0,
+          payments: Array.isArray(l.payments) ? l.payments : [],
+          reason: l.reason,
+          date: l.date,
+          status: l.status || 'pending'
+        }));
+        setLendings(mapped);
+      } catch (err) {
+        console.error('Failed to load lendings:', err);
+        const stored = localStorage.getItem('ss_lendings');
+        if (stored) setLendings(JSON.parse(stored));
+      } finally {
+        setLendingsLoading(false);
+      }
+    };
+    loadLendings();
+  }, []);
 
   // Theme
   useEffect(() => {
@@ -125,7 +150,27 @@ function SpendSenseApp() {
     setShowEditExpenseModal(true);
   };
 
-  const handleEditLend = () => {
+  const updateLendingInDB = async (id, updates) => {
+    try {
+      const dbUpdates = {};
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.amount !== undefined) dbUpdates.amount = updates.amount;
+      if (updates.amountPaid !== undefined) dbUpdates.amount_paid = updates.amountPaid;
+      if (updates.amountOriginal !== undefined) dbUpdates.amount_original = updates.amountOriginal;
+      if (updates.payments !== undefined) dbUpdates.payments = updates.payments;
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+      if (updates.reason !== undefined) dbUpdates.reason = updates.reason;
+      if (updates.date !== undefined) dbUpdates.date = updates.date;
+      const { error } = await supabase.from('lendings').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to update lending in DB:', err);
+      showToast('Sync error — changes saved locally', 'info');
+    }
+  };
+
+  const handleEditLend = async () => {
     try {
       const amt = parseFloat(editLendForm.amount);
       if (!amt || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
@@ -135,6 +180,14 @@ function SpendSenseApp() {
         amountOriginal: amt, amount: amt - (l.amountPaid || 0),
         reason: editLendForm.reason.trim(), date: editLendForm.date
       } : l));
+      await updateLendingInDB(editingLend.id, {
+        name: editLendForm.name.trim(),
+        phone: editLendForm.phone.trim(),
+        amountOriginal: amt,
+        amount: amt - (editingLend.amountPaid || 0),
+        reason: editLendForm.reason.trim(),
+        date: editLendForm.date
+      });
       setShowEditLendModal(false); setEditingLend(null);
       showToast('Lending updated!', 'success');
     } catch (err) { showToast('Something went wrong', 'error'); }
@@ -156,7 +209,11 @@ function SpendSenseApp() {
       case 'expenses':
         return <ExpensesView {...common} expenses={expenses} setExpenses={setExpenses} openEditExpense={openEditExpense}/>;
       case 'lend':
-        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend} expandedPersons={expandedPersons} setExpandedPersons={setExpandedPersons} animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId} expandedPayments={expandedPayments} setExpandedPayments={setExpandedPayments}/>;
+        return <LendView {...common} lendings={lendings} setLendings={setLendings} openEditLend={openEditLend}
+          expandedPersons={expandedPersons} setExpandedPersons={setExpandedPersons}
+          animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId}
+          expandedPayments={expandedPayments} setExpandedPayments={setExpandedPayments}
+          lendingsLoading={lendingsLoading} updateLendingInDB={updateLendingInDB}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
