@@ -28,12 +28,13 @@
 - Fullscreen receipt viewer (React Portal-based)
 
 ### 🤝 Lend Tab
-- Lending ledger with pending / partial / repaid status
-- Record partial or full repayments with payment history
-- Expandable payment history per lending card
-- Confirm full repayment with undo support
-- WhatsApp remind button for borrowers
-- Contact picker integration (mobile)
+- **Grouped Lending View**: Lendings are automatically grouped by person for a cleaner UI
+- One card per person showing их total outstanding amount and overall status
+- Expandable header to view and manage individual lending transactions for that person
+- Record partial or full repayments with detailed payment history per transaction
+- WhatsApp remind button with pre-filled debt details (name, amount, reason)
+- Contact picker integration for quick adding on mobile devices
+- Slide-out animations and clear status indicators (Pending / Partial / Returned)
 
 ### 📊 Summary Tab
 - Monthly stats grid (total, average, highest, transactions)
@@ -61,6 +62,7 @@
 | Layer | Technology |
 |-------|------------|
 | Framework | React 18 + Vite 6 |
+| Auth & DB | Supabase (Optional/Gradual rollout) |
 | Styling | Tailwind CSS 3 |
 | Icons | Lucide React |
 | Storage | `localStorage` (with `ss_` prefix) |
@@ -80,10 +82,11 @@ src/
 ├── utils.js                # Formatting, date, ID helpers
 ├── components/
 │   └── GlobalComponents.jsx  # BottomSheet, BottomNav, ConfirmDialog, Toast
+├── supabaseClient.js         # Supabase client initialization
 └── views/
     ├── HomeView.jsx          # Home tab
     ├── ExpensesView.jsx      # Expenses tab + AddExpenseModal
-    ├── LendView.jsx          # Lend tab + AddLendModal + PartialReturnModal
+    ├── LendView.jsx          # Grouped Lend tab + AddLendModal + repayment logic
     ├── SummaryView.jsx       # Summary tab + AddGoalModal
     ├── AiInsightsView.jsx    # AI Chat tab
     └── SettingsSheet.jsx     # Settings bottom sheet
@@ -94,6 +97,7 @@ public/
 ├── icon-512.png             # PWA icon
 └── .well-known/
     └── assetlinks.json      # Digital Asset Links (Android TWA)
+vercel.json                  # SPA routing rules for Vercel deployment
 ```
 
 ---
@@ -155,9 +159,11 @@ The `/.well-known/assetlinks.json` is deployed on Vercel to verify domain owners
 | Decision | Reason |
 |----------|--------|
 | `localStorage` only | Zero backend — works fully offline |
+| Graceful Auth Check | App boots into "Guest Mode" if Supabase keys are missing or invalid |
+| Grouping via `useMemo` | Computes person-grouped data on the fly based on active filters |
 | React class `ErrorBoundary` | Catches rendering crashes → shows recovery screen instead of blank page |
 | `try/catch` on all form submits | Prevents state corruption on bad input |
-| Object maps for toggle state (`expandedItems`, `swipedItems`) | Avoids illegal `useState` inside `.map()` (Rules of Hooks) |
+| Object maps for toggle state (`expandedPersons`, `expandedPayments`) | Avoids illegal `useState` inside `.map()` (Rules of Hooks) |
 | React Portal for receipt viewer | Bypasses CSS stacking context issues from bottom sheets |
 
 ---
