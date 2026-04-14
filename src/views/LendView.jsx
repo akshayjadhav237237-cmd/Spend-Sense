@@ -159,13 +159,20 @@ export default function LendView({
   const returnedCount=useMemo(()=>lendings.filter(l=>l.status==='returned').length,[lendings]);
   const pendingTotal=useMemo(()=>lendings.filter(l=>l.status==='pending'||l.status==='partial').reduce((s,l)=>s+(parseFloat(l.amount)||0),0),[lendings]);
 
-  // Step 4 — Grouped data
+  // Dead-simple filter — no grouping confusion
+  const filteredLendings = lendings.filter(l => {
+    if (lendFilter === 'returned') return l.status === 'returned';
+    if (lendFilter === 'pending') return l.status === 'pending' || l.status === 'partial';
+    return true;
+  });
+
+  // DEBUG: Keep groupedLendings for the grouped UI but backed by filteredLendings
   const groupedLendings = useMemo(() => {
-    const filtered = lendFilter === 'all' ? lendings
-      : lendFilter === 'pending' ? lendings.filter(l => l.status === 'pending' || l.status === 'partial')
-      : lendings.filter(l => l.status === 'returned');
-    return groupLendingsByPerson(filtered);
-  }, [lendings, lendFilter]);
+    console.log('ALL LENDINGS:', lendings);
+    console.log('CURRENT FILTER:', lendFilter);
+    console.log('FILTERED RESULT:', lendings.filter(l => l.status === 'returned'));
+    return groupLendingsByPerson(filteredLendings);
+  }, [filteredLendings]);
 
   const addLend=useCallback((l)=>{setLendings(p=>[l,...p]);showToast('Lending added!','success');},[setLendings,showToast]);
   const deleteLend=useCallback((id)=>{setLendings(p=>p.filter(l=>l.id!==id));showToast('Deleted','info');setDeleteId(null);},[setLendings,showToast]);
@@ -179,13 +186,17 @@ export default function LendView({
     const newAmountPaid = paymentTarget.amountPaid + amt;
     const newRemaining = paymentTarget.amountOriginal - newAmountPaid;
     const newStatus = newRemaining <= 0 ? 'returned' : 'partial';
-    setLendings(prev => prev.map(l => l.id === paymentTarget.id ? {
-      ...l,
-      amountPaid: newAmountPaid,
-      amount: newRemaining,
-      status: newStatus,
-      payments: [...(l.payments || []), newPayment]
-    } : l));
+    setLendings(prev => {
+      const updated = prev.map(l => l.id === paymentTarget.id ? {
+        ...l,
+        amountPaid: newAmountPaid,
+        amount: newRemaining,
+        status: newStatus,
+        payments: [...(l.payments || []), newPayment]
+      } : l);
+      console.log('UPDATED LENDINGS AFTER PAYMENT:', updated);
+      return updated;
+    });
     setShowPaymentModal(false);
     setPaymentTarget(null);
     setPaymentForm({ amount: '', date: getTodayISO(), note: '' });
@@ -256,12 +267,28 @@ export default function LendView({
       </div>
 
       <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-2xl">
-        {FILTER_TABS.map(t=>(
-          <button key={t.id} onClick={()=>setLendFilter(t.id)} aria-label={t.label}
-            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-indigo-500 ${lendFilter===t.id?'bg-white text-gray-900 shadow-sm':'text-gray-500'}`}>
-            {t.label}{t.count!=null&&<span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${lendFilter===t.id?'bg-indigo-100 text-indigo-600':'bg-gray-200 text-gray-500'}`}>{t.count}</span>}
-          </button>
-        ))}
+        <button
+          onClick={() => setLendFilter('pending')}
+          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${lendFilter==='pending'?'bg-white text-gray-900 shadow-sm':'text-gray-500'}`}
+        >
+          Pending<span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${lendFilter==='pending'?'bg-indigo-100 text-indigo-600':'bg-gray-200 text-gray-500'}`}>{pendingCount}</span>
+        </button>
+        <button
+          onClick={() => {
+            console.log('SWITCHED TO RETURNED TAB');
+            console.log('LENDINGS WITH RETURNED STATUS:', lendings.filter(l => l.status === 'returned'));
+            setLendFilter('returned');
+          }}
+          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${lendFilter==='returned'?'bg-white text-gray-900 shadow-sm':'text-gray-500'}`}
+        >
+          Returned<span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${lendFilter==='returned'?'bg-indigo-100 text-indigo-600':'bg-gray-200 text-gray-500'}`}>{returnedCount}</span>
+        </button>
+        <button
+          onClick={() => setLendFilter('all')}
+          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${lendFilter==='all'?'bg-white text-gray-900 shadow-sm':'text-gray-500'}`}
+        >
+          All
+        </button>
       </div>
 
       {/* Step 4 — Grouped lending cards */}
@@ -393,12 +420,16 @@ export default function LendView({
                           </button>
                           <button
                             onClick={() => {
-                              setLendings(prev => prev.map(l => l.id === lend.id ? {
-                                ...l,
-                                status: 'returned',
-                                amountPaid: l.amountOriginal || parseFloat(l.amount),
-                                amount: 0
-                              } : l));
+                              setLendings(prev => {
+                                const updated = prev.map(l => l.id === lend.id ? {
+                                  ...l,
+                                  status: 'returned',
+                                  amountPaid: l.amountOriginal || parseFloat(l.amount),
+                                  amount: 0
+                                } : l);
+                                console.log('UPDATED LENDINGS AFTER RETURN:', updated);
+                                return updated;
+                              });
                               showToast('Marked as fully returned! 🎉', 'success');
                             }}
                             className="flex-1 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium active:scale-95 transition-transform border border-green-100"
@@ -410,7 +441,16 @@ export default function LendView({
 
                       {lend.status === 'returned' && (
                         <button
-                          onClick={() => setLendings(prev => prev.map(l => l.id === lend.id ? { ...l, status: 'pending', amountPaid: 0, amount: original, payments: [] } : l))}
+                          onClick={() => {
+                            setLendings(prev => prev.map(l => l.id === lend.id ? {
+                              ...l,
+                              status: 'pending',
+                              amountPaid: 0,
+                              amount: l.amountOriginal || parseFloat(l.amount),
+                              payments: []
+                            } : l));
+                            showToast('Moved back to pending', 'info');
+                          }}
                           className="w-full mt-2 py-2 rounded-lg bg-gray-50 text-gray-400 text-xs font-medium active:scale-95 transition-transform border border-gray-100"
                         >
                           Undo
