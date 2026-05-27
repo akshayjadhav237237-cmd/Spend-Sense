@@ -218,6 +218,7 @@ Deployed on **Vercel** with automatic production builds on every push to `main`.
 
 ---
 
-## 📄 License
+## 📄 License & Code of Conduct
 
-MIT © Akshay Jadhav
+- **License:** Distributed under the **Apache License 2.0**. See [LICENSE](LICENSE) for details.
+- **Code of Conduct:** We expect all participants to adhere to our [Code of Conduct](CODE_OF_CONDUCT.md).
