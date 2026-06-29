@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { Sun, Moon, Download, Upload, Trash2 } from 'lucide-react';
 import { CATEGORIES, formatCurr, getTodayISO, parseAmount, generateId } from '../utils.js';
 import { BottomSheet, ConfirmDialog } from '../components/GlobalComponents.jsx';
-import { supabase } from '../supabaseClient.js';
 
 const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', monthly:'Monthly' };
 
@@ -198,9 +197,6 @@ export default function SettingsSheet({ isOpen, onClose, settings, setSettings, 
             </label>
             <button onClick={()=>setClearConfirm(true)} aria-label="Clear all data" className="w-full flex items-center gap-3 py-3 px-4 bg-red-50 border border-red-100 rounded-2xl text-sm font-medium text-red-600 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-red-400">
               <Trash2 size={16}/> Clear All Data
-            </button>
-            <button onClick={async () => { await supabase.auth.signOut(); window.location.reload(); }} aria-label="Log out" className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-gray-900 border border-gray-800 rounded-2xl text-sm font-medium text-white active:scale-95 transition-transform">
-              Log Out
             </button>
           </div>
         </section>

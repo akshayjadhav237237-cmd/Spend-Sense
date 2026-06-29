@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronDown, Trash2, Pencil } from 'lucide-react';
 import { formatCurr, getRelativeDateLabel, getTodayISO, parseAmount, generateId, avatarColor, getInitials } from '../utils.js';
 import { BottomSheet, ConfirmDialog, useContactPicker } from '../components/GlobalComponents.jsx';
-import { supabase } from '../supabaseClient.js';
 
 // Step 2 — Grouping utility
 const groupLendingsByPerson = (lendings) => {
@@ -177,39 +176,13 @@ export default function LendView({
   }, [filteredLendings]);
 
   const addLend = useCallback(async (l) => {
-    try {
-      const dbRecord = {
-        id: l.id,
-        name: l.name,
-        phone: l.phone || '',
-        amount: l.amount,
-        amount_original: l.amountOriginal,
-        amount_paid: 0,
-        payments: [],
-        reason: l.reason,
-        date: l.date,
-        status: 'pending'
-      };
-      const { error } = await supabase.from('lendings').insert([dbRecord]);
-      if (error) throw error;
-      setLendings(p => [l, ...p]);
-      showToast('Lending added!', 'success');
-    } catch (err) {
-      console.error('Add lending error:', err);
-      showToast('Failed to add lending', 'error');
-    }
+    setLendings(p => [l, ...p]);
+    showToast('Lending added!', 'success');
   }, [setLendings, showToast]);
 
-  const deleteLend = useCallback(async (id) => {
-    try {
-      setLendings(p => p.filter(l => l.id !== id));
-      const { error } = await supabase.from('lendings').delete().eq('id', id);
-      if (error) throw error;
-      showToast('Deleted', 'info');
-    } catch (err) {
-      console.error('Delete lending error:', err);
-      showToast('Delete failed', 'error');
-    }
+  const deleteLend = useCallback((id) => {
+    setLendings(p => p.filter(l => l.id !== id));
+    showToast('Deleted', 'info');
     setDeleteId(null);
   }, [setLendings, showToast]);
 
