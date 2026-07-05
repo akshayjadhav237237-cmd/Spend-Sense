@@ -145,7 +145,7 @@ export default function LendView({
   expandedPersons, setExpandedPersons,
   animatingLendId, setAnimatingLendId,
   expandedPayments, setExpandedPayments,
-  lendingsLoading, updateLendingInDB
+  lendingsLoading, updateLendingInDB, remindLending
 }) {
   const sym = settings.currency;
   const [lendFilter,setLendFilter]=useState('pending');
@@ -167,13 +167,7 @@ export default function LendView({
     return true;
   });
 
-  // DEBUG: Keep groupedLendings for the grouped UI but backed by filteredLendings
-  const groupedLendings = useMemo(() => {
-    console.log('ALL LENDINGS:', lendings);
-    console.log('CURRENT FILTER:', lendFilter);
-    console.log('FILTERED RESULT:', lendings.filter(l => l.status === 'returned'));
-    return groupLendingsByPerson(filteredLendings);
-  }, [filteredLendings]);
+  const groupedLendings = useMemo(() => groupLendingsByPerson(filteredLendings), [filteredLendings]);
 
   const addLend = useCallback(async (l) => {
     setLendings(p => [l, ...p]);
@@ -200,7 +194,6 @@ export default function LendView({
       const updates = { amountPaid: newAmountPaid, amount: newRemaining, status: newStatus, payments: newPayments };
       setLendings(prev => {
         const updated = prev.map(l => l.id === paymentTarget.id ? { ...l, ...updates } : l);
-        console.log('UPDATED LENDINGS AFTER PAYMENT:', updated);
         return updated;
       });
       await updateLendingInDB(paymentTarget.id, updates);
@@ -218,32 +211,6 @@ export default function LendView({
     }
   };
 
-  const remindLending = (lend) => {
-    try {
-      const paid = lend.amountPaid || 0;
-      const original = lend.amountOriginal || parseFloat(lend.amount) || 0;
-      const remaining = original - paid;
-      const text = paid > 0
-        ? `Hey ${lend.name}! You borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. You've returned ${sym}${paid.toFixed(2)} so far — ${sym}${remaining.toFixed(2)} is still pending. Please return it when you can!`
-        : `Hey ${lend.name}! Friendly reminder — you borrowed ${sym}${original} from me on ${lend.date} for '${lend.reason}'. Please return it when you can!`;
-
-      if (lend.phone) {
-        const phone = lend.phone.replace(/[^\d]/g, '').slice(-10);
-        window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(text)}`, '_blank');
-      } else {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text)
-            .then(() => showToast('Message copied to clipboard!', 'success'))
-            .catch(() => showToast('Could not copy message', 'error'));
-        } else {
-          showToast('No phone number saved for this contact', 'info');
-        }
-      }
-    } catch (err) {
-      console.error('remindLending error:', err);
-      showToast('Could not send reminder', 'error');
-    }
-  };
 
   const remindAll = () => {
     try {
@@ -286,8 +253,6 @@ export default function LendView({
         </button>
         <button
           onClick={() => {
-            console.log('SWITCHED TO RETURNED TAB');
-            console.log('LENDINGS WITH RETURNED STATUS:', lendings.filter(l => l.status === 'returned'));
             setLendFilter('returned');
           }}
           className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${lendFilter==='returned'?'bg-white text-gray-900 shadow-sm':'text-gray-500'}`}

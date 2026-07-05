@@ -1,10 +1,8 @@
-import React, { useMemo } from 'react';
-import { Settings, TriangleAlert, TrendingUp } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Settings, TriangleAlert } from 'lucide-react';
 import { CATEGORIES, formatCurr, getMonthKey, getCurrentMonthKey, getTodayISO, getBudgetPercent, getInitials, getRelativeDateLabel } from '../utils.js';
 
-const DAY_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-export default function HomeView({ settings, expenses, lendings, setActiveTab, setShowSettings, showToast }) {
+export default function HomeView({ settings, expenses, lendings, setActiveTab, setShowSettings }) {
   const sym = settings.currency;
   const mk = getCurrentMonthKey();
 
@@ -17,23 +15,9 @@ export default function HomeView({ settings, expenses, lendings, setActiveTab, s
   const budgetPct = useMemo(() => getBudgetPercent(expenses, settings.budgetLimit), [expenses, settings.budgetLimit]);
   const budgetColor = budgetPct < 70 ? '#51CF66' : budgetPct < 90 ? '#FFD93D' : '#FF6B6B';
 
-  const sparklineData = useMemo(() => {
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      const total = expenses.filter(e => e.date === iso).reduce((s, e) => s + e.amount, 0);
-      days.push({ label: DAY_LABELS[d.getDay()], iso, total, isToday: iso === getTodayISO() });
-    }
-    return days;
-  }, [expenses]);
-
-  const sparkMax = useMemo(() => Math.max(...sparklineData.map(d => d.total), 1), [sparklineData]);
-  const weekTotal = useMemo(() => sparklineData.reduce((s, d) => s + d.total, 0), [sparklineData]);
-
   const streak = useMemo(() => {
     let count = 0;
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     for (let i = 0; i < 365; i++) {
       const d = new Date(today); d.setDate(d.getDate() - i);
       const iso = d.toISOString().slice(0, 10);
@@ -52,6 +36,44 @@ export default function HomeView({ settings, expenses, lendings, setActiveTab, s
   }, [expenses, lendings]);
 
   const catEmoji = (name) => CATEGORIES.find(c => c.name === name)?.emoji || '💸';
+
+  // ── 30-Day Dual-Line Graph ─────────────────────────────────────────────────
+  const [selectedGraphPoint, setSelectedGraphPoint] = useState(null);
+
+  const graphDays = useMemo(() => {
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const dayExpenses = expenses.filter(e => e.date === iso);
+      const dayLendings = lendings.filter(l => l.date === iso);
+      const expTotal = dayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      const lendTotal = dayLendings.reduce((s, l) => s + (parseFloat(l.amountOriginal || l.amount) || 0), 0);
+      days.push({ iso, expTotal, lendTotal, dayExpenses, dayLendings, label: `${d.getDate()}/${d.getMonth() + 1}` });
+    }
+    return days;
+  }, [expenses, lendings]);
+
+  const hasAnyData = useMemo(() => graphDays.some(d => d.expTotal > 0 || d.lendTotal > 0), [graphDays]);
+  const maxVal = useMemo(() => Math.max(...graphDays.map(d => Math.max(d.expTotal, d.lendTotal)), 1), [graphDays]);
+
+  const SVG_W = 320, SVG_H = 100, PAD_L = 36, PAD_R = 10, PAD_T = 10, PAD_B = 20;
+  const plotW = SVG_W - PAD_L - PAD_R;
+  const plotH = SVG_H - PAD_T - PAD_B;
+
+  const getX = (i) => PAD_L + (i / (graphDays.length - 1)) * plotW;
+  const getY = (val) => PAD_T + plotH - (val / maxVal) * plotH;
+
+  const expPoints = graphDays.map((d, i) => ({ x: getX(i), y: getY(d.expTotal), ...d }));
+  const lendPoints = graphDays.map((d, i) => ({ x: getX(i), y: getY(d.lendTotal), ...d }));
+
+  const expPolyline = expPoints.map(p => `${p.x},${p.y}`).join(' ');
+  const lendPolyline = lendPoints.map(p => `${p.x},${p.y}`).join(' ');
+
+  const gridValues = [0.25, 0.5, 0.75, 1].map(f => ({ f, val: Math.round(maxVal * f) }));
+
+  // X-axis: 5 evenly spaced labels
+  const xLabelIdxs = [0, 7, 14, 21, 29];
 
   return (
     <div className="px-4 pt-4 pb-32 animate-fade-in">
@@ -105,25 +127,99 @@ export default function HomeView({ settings, expenses, lendings, setActiveTab, s
         </div>
       </div>
 
-      {/* Sparkline */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card">
+      {/* 30-Day Interactive Graph */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-50 mb-3 ss-card" onClick={() => setSelectedGraphPoint(null)}>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-sm font-semibold text-gray-700 ss-text">This Week</span>
-          <span className="text-xs font-bold text-[#6C63FF]">{formatCurr(weekTotal, sym)}</span>
+          <span className="text-sm font-semibold text-gray-700 ss-text">Activity — Last 30 Days</span>
         </div>
-        <div className="flex items-end gap-0.5 h-12">
-          {sparklineData.map((d) => (
-            <div key={d.iso} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full rounded-t-md transition-all duration-700"
-                style={{ height: `${(d.total / sparkMax) * 100}%`, minHeight: d.total > 0 ? '4px' : '2px', background: d.isToday ? '#6C63FF' : '#C7D2FE' }} />
+
+        {!hasAnyData ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <span className="text-3xl mb-2">📈</span>
+            <p className="text-sm text-gray-400">No activity yet</p>
+          </div>
+        ) : (
+          <div className="relative">
+            <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" onClick={e => e.stopPropagation()}>
+              {/* Grid lines + Y labels */}
+              {gridValues.map(({ f, val }) => (
+                <g key={f}>
+                  <line x1={PAD_L} x2={SVG_W - PAD_R} y1={getY(maxVal * f)} y2={getY(maxVal * f)} stroke="#F3F4F6" strokeWidth="1" />
+                  <text x={PAD_L - 3} y={getY(maxVal * f) + 3} textAnchor="end" fontSize="7" fill="#9CA3AF">
+                    {val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}
+                  </text>
+                </g>
+              ))}
+
+              {/* X-axis labels */}
+              {xLabelIdxs.map(i => (
+                <text key={i} x={getX(i)} y={SVG_H - 4} textAnchor="middle" fontSize="7" fill="#9CA3AF">
+                  {graphDays[i]?.label}
+                </text>
+              ))}
+
+              {/* Expense line */}
+              <polyline points={expPolyline} fill="none" stroke="#FF6B6B" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+              {/* Lending line */}
+              <polyline points={lendPolyline} fill="none" stroke="#4ECDC4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+
+              {/* Expense data points */}
+              {expPoints.map((p, i) => (
+                <circle key={`exp-${i}`} cx={p.x} cy={p.y} r="4" fill="#FF6B6B" stroke="white" strokeWidth="1.5"
+                  style={{ cursor: 'pointer' }}
+                  onClick={e => { e.stopPropagation(); setSelectedGraphPoint({ idx: i, type: 'exp', x: p.x, y: p.y, day: graphDays[i] }); }}
+                />
+              ))}
+              {/* Lending data points */}
+              {lendPoints.map((p, i) => (
+                <circle key={`lend-${i}`} cx={p.x} cy={p.y} r="4" fill="#4ECDC4" stroke="white" strokeWidth="1.5"
+                  style={{ cursor: 'pointer' }}
+                  onClick={e => { e.stopPropagation(); setSelectedGraphPoint({ idx: i, type: 'lend', x: p.x, y: p.y, day: graphDays[i] }); }}
+                />
+              ))}
+            </svg>
+
+            {/* Popup tooltip */}
+            {selectedGraphPoint && (() => {
+              const { day } = selectedGraphPoint;
+              return (
+                <div className="absolute z-20 bg-white border border-gray-100 rounded-xl shadow-lg p-3 min-w-[180px] text-xs"
+                  style={{ top: 0, left: '50%', transform: 'translateX(-50%)' }}
+                  onClick={e => e.stopPropagation()}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold text-gray-800">{day.iso}</span>
+                    <button onClick={() => setSelectedGraphPoint(null)} className="text-gray-400 hover:text-gray-600 ml-2">✕</button>
+                  </div>
+                  {day.expTotal > 0 && <p className="text-[#FF6B6B] font-medium mb-1">Expenses: {formatCurr(day.expTotal, sym)}</p>}
+                  {day.lendTotal > 0 && <p className="text-[#4ECDC4] font-medium mb-1">Lent: {formatCurr(day.lendTotal, sym)}</p>}
+                  {day.dayExpenses.length === 0 && day.dayLendings.length === 0 && <p className="text-gray-400">No transactions</p>}
+                  {day.dayExpenses.map(e => (
+                    <div key={e.id} className="flex justify-between mt-1 text-gray-600">
+                      <span>{CATEGORIES.find(c => c.name === e.category)?.emoji || '💸'} {e.desc || e.category}</span>
+                      <span className="font-medium text-[#FF6B6B]">{formatCurr(e.amount, sym)}</span>
+                    </div>
+                  ))}
+                  {day.dayLendings.map(l => (
+                    <div key={l.id} className="flex justify-between mt-1 text-gray-600">
+                      <span>🤝 {l.name}</span>
+                      <span className="font-medium text-[#4ECDC4]">{formatCurr(l.amountOriginal || l.amount, sym)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-2 justify-center">
+              <span className="flex items-center gap-1 text-xs text-gray-500">
+                <span className="w-3 h-0.5 rounded-full inline-block" style={{ background: '#FF6B6B' }} /> Expenses
+              </span>
+              <span className="flex items-center gap-1 text-xs text-gray-500">
+                <span className="w-3 h-0.5 rounded-full inline-block" style={{ background: '#4ECDC4' }} /> Lendings
+              </span>
             </div>
-          ))}
-        </div>
-        <div className="flex gap-0.5 mt-1">
-          {sparklineData.map((d) => (
-            <div key={d.iso} className="flex-1 text-center text-[10px] text-gray-400">{d.label}</div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Activity Feed */}
@@ -135,8 +231,8 @@ export default function HomeView({ settings, expenses, lendings, setActiveTab, s
         {recentActivity.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 px-4">
             <span className="text-5xl mb-3">🧾</span>
-            <p className="font-medium text-gray-700 text-sm">No activity yet</p>
-            <p className="text-xs text-gray-400 mt-1 mb-3">Add your first expense to get started</p>
+            <p className="font-medium text-gray-700 text-sm ss-text">No activity yet</p>
+            <p className="text-xs text-gray-400 mt-1 mb-3 ss-text-muted">Add your first expense to get started</p>
             <button onClick={() => setActiveTab('expenses')} className="bg-[#6C63FF] text-white text-xs font-medium px-4 py-2 rounded-full active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500">
               Add Expense
             </button>

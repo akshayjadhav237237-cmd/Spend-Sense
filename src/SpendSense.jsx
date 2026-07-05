@@ -7,47 +7,91 @@ import SummaryView from './views/SummaryView.jsx';
 import AiInsightsView from './views/AiInsightsView.jsx';
 import SettingsSheet from './views/SettingsSheet.jsx';
 import { getTodayISO, generateId, CATEGORIES } from './utils.js';
-import { Camera, X, Pencil } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 
-const DEFAULT_SETTINGS = { name:'Student', currency:'₹', theme:'light', budgetLimit:0, weeklyDigest:false, haptics:true };
-
-function safeLoad(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-  catch(e) { console.warn('SpendSense: failed to load', key); return fallback; }
-}
-
-function safeSave(key, value, showToast) {
-  try { localStorage.setItem(key, JSON.stringify(value)); }
-  catch(e) { showToast?.('Storage error. Data may not be saved.', 'error'); }
-}
+const DEFAULT_SETTINGS = { name: 'Student', currency: '₹', theme: 'light', budgetLimit: 0, weeklyDigest: false, haptics: true };
 
 function nextDueDateCalc(freq, from) {
   const d = new Date(from + 'T00:00:00');
-  if(freq==='daily') d.setDate(d.getDate()+1);
-  else if(freq==='weekly') d.setDate(d.getDate()+7);
-  else d.setMonth(d.getMonth()+1);
-  return d.toISOString().slice(0,10);
+  if (freq === 'daily') d.setDate(d.getDate() + 1);
+  else if (freq === 'weekly') d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function SpendSenseApp() {
   const [activeTab, setActiveTab] = useState('home');
-  const [settings, setSettings] = useState(() => safeLoad('ss_settings', DEFAULT_SETTINGS));
+
+  // ── State with safe lazy initializers ────────────────────────────────────
+  const [settings, setSettings] = useState(() => {
+    try {
+      const s = localStorage.getItem('ss_settings');
+      if (!s) return DEFAULT_SETTINGS;
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(s) };
+    } catch { return DEFAULT_SETTINGS; }
+  });
+
   const [expenses, setExpenses] = useState(() => {
-    const loaded = safeLoad('ss_expenses', []);
-    return Array.isArray(loaded) ? loaded.filter(e => e?.id && e?.amount && e?.date) : [];
+    try {
+      const s = localStorage.getItem('ss_expenses');
+      if (!s) return [];
+      const p = JSON.parse(s);
+      return Array.isArray(p) ? p.filter(e => e?.id && e?.amount && e?.date) : [];
+    } catch { return []; }
   });
+
   const [lendings, setLendings] = useState(() => {
-    const loaded = safeLoad('ss_lendings', []);
-    return Array.isArray(loaded) ? loaded : [];
+    try {
+      const stored = localStorage.getItem('ss_lendings');
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(l => ({
+        ...l,
+        amountOriginal: l.amountOriginal ?? parseFloat(l.amount) ?? 0,
+        amountPaid: l.amountPaid ?? 0,
+        payments: Array.isArray(l.payments) ? l.payments.map(p => ({
+          id: p.id || generateId(),
+          amount: parseFloat(p.amount) || 0,
+          date: p.date || getTodayISO(),
+          note: p.note || ''
+        })) : [],
+        status: l.status ?? 'pending'
+      }));
+    } catch (err) { console.warn('Failed to load lendings:', err); return []; }
   });
-  const [lendingsLoading] = useState(false);
-  const [recurringExpenses, setRecurringExpenses] = useState(() => safeLoad('ss_recurring', []));
-  const [savingsGoals, setSavingsGoals] = useState(() => safeLoad('ss_goals', []));
-  const [chatHistory, setChatHistory] = useState(() => safeLoad('ss_chat', []));
+
+  const [recurringExpenses, setRecurringExpenses] = useState(() => {
+    try {
+      const s = localStorage.getItem('ss_recurring');
+      if (!s) return [];
+      const p = JSON.parse(s);
+      return Array.isArray(p) ? p : [];
+    } catch { return []; }
+  });
+
+  const [savingsGoals, setSavingsGoals] = useState(() => {
+    try {
+      const s = localStorage.getItem('ss_goals');
+      if (!s) return [];
+      const p = JSON.parse(s);
+      return Array.isArray(p) ? p : [];
+    } catch { return []; }
+  });
+
+  const [chatHistory, setChatHistory] = useState(() => {
+    try {
+      const s = localStorage.getItem('ss_chat');
+      if (!s) return [];
+      const p = JSON.parse(s);
+      return Array.isArray(p) ? p : [];
+    } catch { return []; }
+  });
+
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Grouped lending state
+  // Grouped lending state (top-level dictionaries — no hooks inside maps)
   const [expandedPersons, setExpandedPersons] = useState({});
   const [animatingLendId, setAnimatingLendId] = useState(null);
   const [expandedPayments, setExpandedPayments] = useState({});
@@ -67,37 +111,62 @@ function SpendSenseApp() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // localStorage sync (all data stored locally)
-  useEffect(() => { safeSave('ss_settings', settings, showToast); }, [settings]);
-  useEffect(() => { safeSave('ss_expenses', expenses, showToast); }, [expenses]);
-  useEffect(() => { safeSave('ss_lendings', lendings, showToast); }, [lendings]);
-  useEffect(() => { safeSave('ss_recurring', recurringExpenses, showToast); }, [recurringExpenses]);
-  useEffect(() => { safeSave('ss_goals', savingsGoals, showToast); }, [savingsGoals]);
-  useEffect(() => { safeSave('ss_chat', chatHistory, showToast); }, [chatHistory]);
-  // Theme
+  // ── localStorage sync (try/catch per Part 1, Rule 3) ─────────────────────
+  useEffect(() => { try { localStorage.setItem('ss_settings', JSON.stringify(settings)); } catch (e) { console.warn(e); } }, [settings]);
+  useEffect(() => { try { localStorage.setItem('ss_expenses', JSON.stringify(expenses)); } catch (e) { console.warn(e); } }, [expenses]);
+  useEffect(() => { try { localStorage.setItem('ss_lendings', JSON.stringify(lendings)); } catch (e) { console.warn(e); } }, [lendings]);
+  useEffect(() => { try { localStorage.setItem('ss_recurring', JSON.stringify(recurringExpenses)); } catch (e) { console.warn(e); } }, [recurringExpenses]);
+  useEffect(() => { try { localStorage.setItem('ss_goals', JSON.stringify(savingsGoals)); } catch (e) { console.warn(e); } }, [savingsGoals]);
+  useEffect(() => { try { localStorage.setItem('ss_chat', JSON.stringify(chatHistory)); } catch (e) { console.warn(e); } }, [chatHistory]);
+
+  // ── Dark mode: set data-theme on #ss-root ────────────────────────────────
   useEffect(() => {
+    const root = document.getElementById('ss-root');
+    if (root) root.setAttribute('data-theme', settings.theme === 'dark' ? 'dark' : 'light');
+    // Also set on documentElement for any legacy selectors
     document.documentElement.setAttribute('data-theme', settings.theme || 'light');
   }, [settings.theme]);
 
-  // Recurring expense auto-add on mount
+  // ── Auto backup on mount (Update 4) ─────────────────────────────────────
+  useEffect(() => {
+    const createAutoBackup = () => {
+      try {
+        const lightExpenses = expenses.map(({ photo, ...rest }) => rest);
+        const backup = {
+          version: '1.2',
+          backupDate: new Date().toISOString(),
+          settings, expenses: lightExpenses, lendings, savingsGoals, recurringExpenses
+        };
+        const existing = JSON.parse(localStorage.getItem('ss_backups') || '[]');
+        const updated = [backup, ...existing].slice(0, 5);
+        localStorage.setItem('ss_backups', JSON.stringify(updated));
+        localStorage.setItem('ss_last_backup', new Date().toISOString());
+      } catch (err) { console.warn('Auto backup failed:', err); }
+    };
+    const timer = setTimeout(createAutoBackup, 2000);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Recurring expense auto-add on mount ──────────────────────────────────
   useEffect(() => {
     const today = getTodayISO();
     let newExpenses = [];
     const updated = recurringExpenses.map(r => {
-      if(!r.active || r.nextDue > today) return r;
+      if (!r.active || r.nextDue > today) return r;
       const exp = { id: generateId(), amount: r.amount, category: r.category, desc: r.desc, date: today, createdAt: Date.now() };
       newExpenses.push({ exp, desc: r.desc, amount: r.amount });
       return { ...r, nextDue: nextDueDateCalc(r.frequency, today) };
     });
-    if(newExpenses.length > 0) {
+    if (newExpenses.length > 0) {
       setExpenses(prev => [...newExpenses.map(x => x.exp), ...prev]);
       setRecurringExpenses(updated);
       newExpenses.forEach(({ desc, amount }) => {
         setTimeout(() => showToast(`Auto-added: ${desc} — ${settings.currency}${amount}`, 'info'), 500);
       });
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Edit expense ─────────────────────────────────────────────────────────
   const handleEditExpense = () => {
     try {
       const amt = parseFloat(editExpenseForm.amount);
@@ -118,9 +187,10 @@ function SpendSenseApp() {
     setShowEditExpenseModal(true);
   };
 
-  // No-op: lendings are now fully local, saved via useEffect above
+  // No-op: lendings are fully local
   const updateLendingInDB = () => {};
 
+  // ── Edit lending ─────────────────────────────────────────────────────────
   const handleEditLend = () => {
     try {
       const amt = parseFloat(editLendForm.amount);
@@ -142,11 +212,41 @@ function SpendSenseApp() {
     setShowEditLendModal(true);
   };
 
+  // ── Itemized remind (Update 3) ───────────────────────────────────────────
+  const remindLending = useCallback((lend) => {
+    try {
+      const original = lend.amountOriginal || parseFloat(lend.amount) || 0;
+      const paid = lend.amountPaid || 0;
+      const remaining = original - paid;
+      const payments = lend.payments || [];
+      let paymentHistory = '';
+      if (payments.length > 0) {
+        paymentHistory = '\n\nPayment history:\n' + payments.map((p, i) =>
+          `${i + 1}. ${p.date} — ${settings.currency}${parseFloat(p.amount).toFixed(2)}${p.note ? ` (${p.note})` : ''}`
+        ).join('\n');
+      }
+      const text = payments.length > 0
+        ? `Hey ${lend.name}! 👋 Friendly reminder about the money you borrowed.\n\nOriginal amount: ${settings.currency}${original}\nFor: ${lend.reason}\nDate borrowed: ${lend.date}${paymentHistory}\n\nTotal returned so far: ${settings.currency}${paid.toFixed(2)}\nStill pending: ${settings.currency}${remaining.toFixed(2)}\n\nPlease return the remaining amount when you can! 😊`
+        : `Hey ${lend.name}! 👋 Friendly reminder — you borrowed ${settings.currency}${original} from me on ${lend.date} for '${lend.reason}'. Please return it when you can! 😊`;
+      if (lend.phone) {
+        const phone = lend.phone.replace(/[^\d]/g, '').slice(-10);
+        window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(text)}`, '_blank');
+      } else {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast('Message copied!', 'success'))
+          .catch(() => showToast('No phone number saved', 'info'));
+      }
+    } catch (err) {
+      console.error('remindLending error:', err);
+      showToast('Could not send reminder', 'error');
+    }
+  }, [settings, showToast]);
+
   const isDark = settings.theme === 'dark';
 
   const renderTab = () => {
     const common = { settings, showToast };
-    switch(activeTab) {
+    switch (activeTab) {
       case 'home':
         return <HomeView {...common} expenses={expenses} lendings={lendings} setActiveTab={setActiveTab} setShowSettings={setShowSettings}/>;
       case 'expenses':
@@ -156,7 +256,8 @@ function SpendSenseApp() {
           expandedPersons={expandedPersons} setExpandedPersons={setExpandedPersons}
           animatingLendId={animatingLendId} setAnimatingLendId={setAnimatingLendId}
           expandedPayments={expandedPayments} setExpandedPayments={setExpandedPayments}
-          lendingsLoading={lendingsLoading} updateLendingInDB={updateLendingInDB}/>;
+          lendingsLoading={false} updateLendingInDB={updateLendingInDB}
+          remindLending={remindLending}/>;
       case 'summary':
         return <SummaryView {...common} expenses={expenses} lendings={lendings} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals}/>;
       case 'chat':
@@ -180,11 +281,7 @@ function SpendSenseApp() {
           0% { transform: translateX(0); opacity: 1; max-height: 300px; }
           100% { transform: translateX(110%); opacity: 0; max-height: 0; padding: 0; margin: 0; }
         }
-        .lend-exit {
-          animation: slideOutRight 0.6s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-          pointer-events: none;
-          overflow: hidden;
-        }
+        .lend-exit { animation: slideOutRight 0.6s cubic-bezier(0.55, 0, 1, 0.45) forwards; pointer-events: none; overflow: hidden; }
         .animate-fade-in { animation: fadeIn 200ms ease-out both }
         .animate-slide-up { animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both }
         .animate-scale-in { animation: scaleIn 200ms ease-out both }
@@ -198,6 +295,8 @@ function SpendSenseApp() {
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation: none !important; transition: none !important; }
         }
+
+        /* ── Dark Mode — exhaustive overrides ─────────────────────────── */
         [data-theme="dark"] {
           --ss-bg: #0F0F1A;
           --ss-surface: #1A1A2E;
@@ -205,23 +304,74 @@ function SpendSenseApp() {
           --ss-text: #E8E8F4;
           --ss-text-muted: #9090B0;
           --ss-border: rgba(255,255,255,0.08);
+          color-scheme: dark;
         }
-        [data-theme="dark"] .ss-page-bg   { background-color: #0F0F1A !important; }
-        [data-theme="dark"] .ss-card      { background-color: #1A1A2E !important; border-color: rgba(255,255,255,0.07) !important; }
-        [data-theme="dark"] .ss-text      { color: #E8E8F4 !important; }
-        [data-theme="dark"] .ss-text-muted{ color: #9090B0 !important; }
-        [data-theme="dark"] .ss-input     { background-color: #252540 !important; color: #E8E8F4 !important; border-color: rgba(255,255,255,0.12) !important; }
-        [data-theme="dark"] .ss-bottom-nav{ background-color: #1A1A2E !important; border-color: rgba(255,255,255,0.07) !important; }
-        [data-theme="dark"] .ss-bottom-sheet { background-color: #1A1A2E !important; }
-        [data-theme="dark"] .ss-chip-inactive { background-color: #252540 !important; color: #C0C0E0 !important; border-color: rgba(255,255,255,0.1) !important; }
-        [data-theme="dark"] .ss-section-header { color: #9090B0 !important; background-color: #0F0F1A !important; }
-        [data-theme="dark"] .ss-drag-handle { background-color: #3A3A5C !important; }
-        [data-theme="dark"] .ss-divider   { border-color: rgba(255,255,255,0.07) !important; }
-        [data-theme="dark"] .ss-avatar-bg { background-color: #2D2D50 !important; }
+        /* Page bg */
+        [data-theme="dark"] .ss-page-bg,
+        [data-theme="dark"] .bg-\\[\\#F8F9FF\\]   { background-color: #0F0F1A !important; }
+        /* Cards */
+        [data-theme="dark"] .ss-card,
+        [data-theme="dark"] .bg-white            { background-color: #1A1A2E !important; border-color: rgba(255,255,255,0.07) !important; }
+        /* Inputs */
+        [data-theme="dark"] .ss-input,
+        [data-theme="dark"] .bg-gray-50          { background-color: #252540 !important; color: #E8E8F4 !important; border-color: rgba(255,255,255,0.12) !important; }
+        /* Text */
+        [data-theme="dark"] .ss-text,
+        [data-theme="dark"] .text-gray-900,
+        [data-theme="dark"] .text-gray-800,
+        [data-theme="dark"] .text-gray-700       { color: #E8E8F4 !important; }
+        [data-theme="dark"] .ss-text-muted,
+        [data-theme="dark"] .text-gray-500,
+        [data-theme="dark"] .text-gray-400,
+        [data-theme="dark"] .text-gray-300       { color: #9090B0 !important; }
+        [data-theme="dark"] .text-gray-600       { color: #B0B0D0 !important; }
+        /* Borders */
+        [data-theme="dark"] .border-gray-50,
+        [data-theme="dark"] .border-gray-100,
+        [data-theme="dark"] .border-gray-200     { border-color: rgba(255,255,255,0.08) !important; }
+        /* Nav */
+        [data-theme="dark"] .ss-bottom-nav,
+        [data-theme="dark"] nav.fixed            { background-color: #1A1A2E !important; border-color: rgba(255,255,255,0.07) !important; }
+        /* Sheets */
+        [data-theme="dark"] .ss-bottom-sheet    { background-color: #1A1A2E !important; }
+        /* Chips / inactive buttons */
+        [data-theme="dark"] .ss-chip-inactive   { background-color: #252540 !important; color: #C0C0E0 !important; border-color: rgba(255,255,255,0.10) !important; }
+        /* Section headers */
+        [data-theme="dark"] .ss-section-header  { color: #9090B0 !important; background-color: #0F0F1A !important; }
+        /* Drag handle */
+        [data-theme="dark"] .ss-drag-handle     { background-color: #3A3A5C !important; }
+        /* Dividers */
+        [data-theme="dark"] .ss-divider,
+        [data-theme="dark"] .border-b           { border-color: rgba(255,255,255,0.06) !important; }
+        /* Avatar bg */
+        [data-theme="dark"] .ss-avatar-bg,
+        [data-theme="dark"] .bg-indigo-100      { background-color: #2D2D50 !important; }
+        /* Sticky/scroll headers */
+        [data-theme="dark"] .sticky             { background-color: #0F0F1A !important; }
+        /* Badges */
+        [data-theme="dark"] .bg-orange-50       { background-color: #2A1A0A !important; }
+        [data-theme="dark"] .bg-indigo-50       { background-color: #1A1A3A !important; }
+        [data-theme="dark"] .bg-red-50          { background-color: #2A0A0A !important; }
+        [data-theme="dark"] .bg-green-50        { background-color: #0A2A0A !important; }
+        [data-theme="dark"] .bg-yellow-50       { background-color: #2A2000 !important; }
+        [data-theme="dark"] .text-indigo-800    { color: #A0A0FF !important; }
+        [data-theme="dark"] .text-red-800       { color: #FF9090 !important; }
+        [data-theme="dark"] .text-green-800     { color: #90FF90 !important; }
+        [data-theme="dark"] .text-yellow-800    { color: #FFD080 !important; }
+        [data-theme="dark"] .text-indigo-600,
+        [data-theme="dark"] .text-indigo-700    { color: #8080FF !important; }
+        /* SVG grid lines */
+        [data-theme="dark"] svg line            { stroke: #2A2A4A !important; }
+        [data-theme="dark"] svg text            { fill: #6060A0 !important; }
+        /* Progress bar tracks */
+        [data-theme="dark"] .bg-gray-100        { background-color: #252540 !important; }
+        /* Modals */
+        [data-theme="dark"] .bg-black\\/50      { background-color: rgba(0,0,0,0.7) !important; }
       `}</style>
 
       <div
-        className={`w-full min-h-screen relative overflow-hidden font-sans selection:bg-indigo-100 flex flex-col ss-root ss-page-bg ${isDark ? 'bg-[#0F0F1A]' : 'bg-[#F8F9FF]'}`}
+        id="ss-root"
+        className={`w-full min-h-screen relative overflow-hidden font-sans selection:bg-indigo-100 flex flex-col ss-page-bg ${isDark ? 'bg-[#0F0F1A]' : 'bg-[#F8F9FF]'}`}
         data-theme={settings.theme}
       >
         <OfflineBanner/>
@@ -249,7 +399,7 @@ function SpendSenseApp() {
 
         {/* Edit Expense Modal */}
         <BottomSheet isOpen={showEditExpenseModal} onClose={() => { setShowEditExpenseModal(false); setEditingExpense(null); }} title="Edit Expense">
-          <div className="px-4 space-y-4">
+          <div className="space-y-4">
             <div>
               <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Amount</label>
               <div className="flex items-center bg-gray-50 rounded-xl px-3 ss-input">
@@ -308,7 +458,7 @@ function SpendSenseApp() {
 
         {/* Edit Lending Modal */}
         <BottomSheet isOpen={showEditLendModal} onClose={() => { setShowEditLendModal(false); setEditingLend(null); }} title="Edit Lending">
-          <div className="px-4 space-y-4">
+          <div className="space-y-4">
             <div>
               <label className="text-xs font-medium text-gray-500 ss-text-muted mb-1.5 block">Name</label>
               <input type="text" className="w-full bg-gray-50 rounded-xl px-3 py-3 text-sm outline-none ss-input"
@@ -358,12 +508,20 @@ class ErrorBoundary extends React.Component {
           <p className="text-4xl mb-4">💸</p>
           <h2 className="font-semibold text-lg text-gray-800 mb-2">Something went wrong</h2>
           <p className="text-sm text-gray-400 text-center mb-6">{this.state.error?.message || 'Unknown error'}</p>
-          <button
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            className="px-6 py-3 bg-[#6C63FF] text-white rounded-2xl text-sm font-medium active:scale-95 transition-transform"
-          >
-            Reset App &amp; Reload
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="px-5 py-3 bg-indigo-100 text-indigo-700 rounded-2xl text-sm font-medium active:scale-95 transition-transform"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => { localStorage.clear(); window.location.reload(); }}
+              className="px-5 py-3 bg-[#FF6B6B] text-white rounded-2xl text-sm font-medium active:scale-95 transition-transform"
+            >
+              Reset App
+            </button>
+          </div>
         </div>
       );
     }

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Sun, Moon, Download, Upload, Trash2 } from 'lucide-react';
+import { Sun, Moon, Download, Upload, Trash2, RotateCcw } from 'lucide-react';
 import { CATEGORIES, formatCurr, getTodayISO, parseAmount, generateId } from '../utils.js';
 import { BottomSheet, ConfirmDialog } from '../components/GlobalComponents.jsx';
 
@@ -15,6 +15,7 @@ function nextDueDate(freq, from) {
 
 export default function SettingsSheet({ isOpen, onClose, settings, setSettings, expenses, lendings, savingsGoals, recurringExpenses, setRecurringExpenses, setExpenses, setLendings, setSavingsGoals, showToast }) {
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState(null); // backup object to restore
   const [showRecurring, setShowRecurring] = useState(false);
   const [recForm, setRecForm] = useState({ amount:'', category:'Food', desc:'', frequency:'monthly', nextDue: getTodayISO(), active:true });
 
@@ -188,10 +189,10 @@ export default function SettingsSheet({ isOpen, onClose, settings, setSettings, 
         <section>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Data Management</p>
           <div className="space-y-2">
-            <button onClick={exportData} aria-label="Export data" className="w-full flex items-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500">
+            <button onClick={exportData} aria-label="Export data" className="w-full flex items-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 ss-card ss-text">
               <Download size={16} className="text-indigo-500"/> Export Backup (JSON)
             </button>
-            <label className="w-full flex items-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 cursor-pointer active:scale-95 transition-transform">
+            <label className="w-full flex items-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 cursor-pointer active:scale-95 transition-transform ss-card ss-text">
               <Upload size={16} className="text-green-500"/> Import Backup
               <input type="file" accept=".json,application/json" onChange={importData} className="hidden"/>
             </label>
@@ -200,12 +201,53 @@ export default function SettingsSheet({ isOpen, onClose, settings, setSettings, 
             </button>
           </div>
         </section>
+
+        {/* Auto Backup Restore */}
+        {(() => {
+          let backups = [];
+          try { backups = JSON.parse(localStorage.getItem('ss_backups') || '[]'); } catch {}
+          if (!backups.length) return null;
+          return (
+            <section>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Restore from Auto-Backup</p>
+              <div className="space-y-2">
+                {backups.map((b, i) => (
+                  <div key={i} className="flex items-center justify-between py-2.5 px-3 bg-white border border-gray-100 rounded-2xl ss-card">
+                    <div>
+                      <p className="text-xs font-medium text-gray-700 ss-text">v{b.version} — {new Date(b.backupDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      <p className="text-[10px] text-gray-400 ss-text-muted mt-0.5">{(b.expenses||[]).length} expenses · {(b.lendings||[]).length} lendings</p>
+                    </div>
+                    <button onClick={() => setRestoreConfirm(b)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-medium active:scale-95 transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500">
+                      <RotateCcw size={12}/> Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })()}
       </div>
 
       <ConfirmDialog isOpen={clearConfirm} title="Delete Everything?" message="This will permanently delete all your expenses, lendings, and goals. This cannot be undone."
         confirmLabel="Delete Everything" confirmColor="#FF6B6B"
         onConfirm={()=>{ setExpenses([]); setLendings([]); setSavingsGoals([]); setClearConfirm(false); showToast('All data cleared','info'); onClose(); }}
         onCancel={()=>setClearConfirm(false)}/>
+
+      <ConfirmDialog isOpen={!!restoreConfirm} title="Restore Backup?" message="This will overwrite your current expenses, lendings, goals, and settings with the selected backup. This cannot be undone."
+        confirmLabel="Restore" confirmColor="#6C63FF"
+        onConfirm={()=>{
+          if (!restoreConfirm) return;
+          try {
+            if (Array.isArray(restoreConfirm.expenses)) setExpenses(restoreConfirm.expenses);
+            if (Array.isArray(restoreConfirm.lendings)) setLendings(restoreConfirm.lendings);
+            if (Array.isArray(restoreConfirm.savingsGoals)) setSavingsGoals(restoreConfirm.savingsGoals);
+            if (restoreConfirm.settings) setSettings(s => ({ ...s, ...restoreConfirm.settings }));
+            showToast('Backup restored!', 'success');
+          } catch (e) { showToast('Restore failed', 'error'); }
+          setRestoreConfirm(null); onClose();
+        }}
+        onCancel={()=>setRestoreConfirm(null)}/>
     </BottomSheet>
   );
 }
